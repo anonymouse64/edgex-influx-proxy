@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	"github.com/edgexfoundry/edgex-go/core/domain/models"
 	flags "github.com/jessevdk/go-flags"
 )
 
@@ -53,6 +55,13 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 
 	// always use a clean session
 	connOpts.SetCleanSession(true)
+
+	// always reconnect
+	connOpts.SetAutoReconnect(true)
+
+	// set the connection and connection lost handler
+	connOpts.SetConnectionLostHandler(onDisconnect)
+	connOpts.SetOnConnectHandler(onConnect)
 
 	// Setup the broker hostname, checking for SSL
 	var brokerHost string
@@ -110,7 +119,7 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		fmt.Printf("Connected to %s\n", brokerHost)
 	}
 
-	// Wait for signals and then disconnect safely
+	// Wait for signals and disconnect safely
 	<-c
 	client.Disconnect(0)
 
@@ -122,9 +131,35 @@ func genNewClientID() string {
 	return "unique"
 }
 
+var dataStore map[string][]models.Reading
+
 // TODO: this should parse the message from edgex and save it into an in memory database, etc.
 func onMessageReceived(client MQTT.Client, message MQTT.Message) {
-	fmt.Printf("Received message on topic: %s\nMessage: %s\n", message.Topic(), message.Payload())
+	var event models.Event
+	err := json.Unmarshal(message.Payload(), &event)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error decoding message: %+v", err)
+	} else {
+		// fmt.Printf("event : %+v\n", event)
+
+		// Store all of the readings into the in memory data store
+		for _, reading := range event.Readings {
+			if _, ok := dataStore[reading.Name]; !ok {
+				dataStore[reading.Name] = make([]models.Reading, 0)
+			}
+			dataStore[reading.Name] = append(dataStore[reading.Name], reading)
+		}
+	}
+}
+
+// mqtt disconnect callback
+func onDisconnect(client MQTT.Client, err error) {
+	fmt.Printf("client disconnected: %+v\n", err)
+}
+
+// mqtt connect callback
+func onConnect(client MQTT.Client) {
+	fmt.Println("client connected")
 }
 
 // command parser
@@ -132,6 +167,7 @@ var parser = flags.NewParser(&cmd, flags.Default)
 
 // empty - the command execution happens in *.Execute methods
 func main() {
+	dataStore = make(map[string][]models.Reading)
 	_, err := parser.Parse()
 	if err != nil {
 		os.Exit(1)
