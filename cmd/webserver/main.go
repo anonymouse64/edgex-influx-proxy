@@ -312,7 +312,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	var err error
 	for index, rIndex := uint64(0), rStart-1; index < size; index, rIndex = index+1, rIndex+1 {
 		// Save the time value as a float64, and parse the value string into a float64 as well
-		pts[index].X = float64(readings[rIndex].Origin)
+		pts[index].X = float64(readings[rIndex].Origin) / 1000.0
 		pts[index].Y, err = strconv.ParseFloat(readings[rIndex].Value, 64)
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, err, HTTPInvalidReading)
@@ -328,7 +328,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	}
 
 	p.Title.Text = fmt.Sprintf("%s %s Data", readings[0].Device, name)
-	p.X.Tick.Marker = plot.TimeTicks{Format: "2006-01-02\n15:04"}
+	p.X.Tick.Marker = plot.TimeTicks{Format: "15:04:05.000"}
 	p.X.Label.Text = "Time"
 	p.Y.Label.Text = name
 
