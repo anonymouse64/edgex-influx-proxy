@@ -28,7 +28,6 @@ import (
 )
 
 const (
-	DEBUG            = true
 	HTTPUnknownError = iota
 	HTTPInvalidFormat
 	HTTPInvalidName
@@ -190,6 +189,13 @@ func onConnect(client MQTT.Client) {
 	fmt.Println("client connected")
 }
 
+// setAPICommonHeaders sets things like cache-control, expires, etc. for the response
+func setAPICommonHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Control", "no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0, false")
+	w.Header().Set("Expires", "-1")
+	w.Header().Set("Pragma", "no-cache")
+}
+
 // formatResponse will take the provided value and output it to the http response
 // in the specified format
 // It handles any encoding errors and returns
@@ -201,44 +207,53 @@ func onConnect(client MQTT.Client) {
 // - XML (note this doesn't work for all data types - notably maps don't serialize with XML)
 func formatResponse(format string, w http.ResponseWriter, val interface{}) {
 	// to force browser to display the page, useful in debugging
-	if DEBUG {
-		w.Header().Set("Content-Disposition", "inline")
-	}
 	errCode := HTTPUnknownError
 	status := http.StatusInternalServerError
 	var err error
+	var valBytes []byte
 	switch strings.ToLower(format) {
 	case "":
 		// default to json if not specified
 		fallthrough
 	case "json":
-		err = json.NewEncoder(w).Encode(val)
-		// only set the content-type if we're successful
-		// if there was some error, we'll let the error handler set the content-type
+		valBytes, err = json.Marshal(val)
 		if err == nil {
 			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+			setAPICommonHeaders(w)
+			w.Write(valBytes)
 		}
 	case "bson":
-		err = bson.NewEncoder(w).Encode(val)
-		// only set the content-type if we're successful
-		// if there was some error, we'll let the error handler set the content-type
+		valBytes, err = bson.Marshal(val)
 		if err == nil {
 			w.Header().Set("Content-Type", "application/bson; charset=UTF-8")
+			setAPICommonHeaders(w)
+			w.Write(valBytes)
 		}
 	case "yaml":
-		err = yaml.NewEncoder(w).Encode(val)
+		valBytes, err = yaml.Marshal(val)
 		if err == nil {
 			w.Header().Set("Content-Type", "text/x-yaml; charset=UTF-8")
+			setAPICommonHeaders(w)
+			w.Write(valBytes)
 		}
 	case "gob":
-		err = gob.NewEncoder(w).Encode(val)
+		// because gob doesn't support a Marshal method, we use an intermediary bytes.Buffer
+		// to store the bytes, this is desirable, because if the encoding fails, we won't have written
+		// anything to the response, and so we can still let the error method own all the response setting
+		// the status code, headers, etc.
+		var bytesBuf bytes.Buffer
+		err = gob.NewEncoder(&bytesBuf).Encode(val)
 		if err == nil {
 			w.Header().Set("Content-Type", "application/x-gob; charset=UTF-8")
+			setAPICommonHeaders(w)
+			io.Copy(w, &bytesBuf)
 		}
 	case "xml":
-		err = xml.NewEncoder(w).Encode(val)
+		valBytes, err = xml.MarshalIndent(val, "  ", "    ")
 		if err == nil {
 			w.Header().Set("Content-Type", "application/xml; charset=UTF-8")
+			setAPICommonHeaders(w)
+			w.Write(valBytes)
 		}
 	default:
 		err = fmt.Errorf("invalid format: %v", format)
@@ -255,9 +270,10 @@ func formatResponse(format string, w http.ResponseWriter, val interface{}) {
 
 // sendError will send the error details in JSON to the http response specified
 func sendError(w http.ResponseWriter, status int, err error, code int) {
-	w.WriteHeader(status)
 	// we always return error codes in json
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	setAPICommonHeaders(w)
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(HTTPErrorResponse{
 		Error: err.Error(),
 		Code:  code,
@@ -270,8 +286,7 @@ func sendError(w http.ResponseWriter, status int, err error, code int) {
 // handler for getting all current readings
 func currentData(w http.ResponseWriter, req *http.Request) {
 	// get format rest parameter
-	format := req.URL.Query().Get("format")
-	formatResponse(format, w, dataStore)
+	formatResponse(req.URL.Query().Get("format"), w, dataStore)
 }
 
 // handler for generating a plot of data
@@ -414,7 +429,9 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	// need to set the content-type for this as well
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Content-Disposition", "inline")
+	setAPICommonHeaders(w)
 	plotWriter.WriteTo(w)
+
 }
 
 // command parser
