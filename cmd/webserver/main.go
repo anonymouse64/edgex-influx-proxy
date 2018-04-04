@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	EdgeXCreateMQTTRegistrationJSON = `{
+	edgeXCreateMQTTRegistrationJSON = `{
 	"name":"golang-server",
 	"enable":true,
 	"format":"JSON",
@@ -95,7 +95,7 @@ type StartCmd struct {
 	HTTPHost string `short:"a" long:"http-host" description:"HTTP server hostname to bind on" default:"0.0.0.0"`
 }
 
-// StartCmd will start running the web server
+// Execute of StartCmd will start running the web server
 func (cmd *StartCmd) Execute(args []string) (err error) {
 
 	client, err := setupMQTTClient(cmd)
@@ -109,7 +109,7 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		res, err := http.Post(
 			fmt.Sprintf("http://%s:%d/api/v1/registration", cmd.EdgeXExportDistroHost, cmd.EdgeXExportDistroPort),
 			"application/json",
-			bytes.NewBufferString(fmt.Sprintf(EdgeXCreateMQTTRegistrationJSON, cmd.MQTTHost, cmd.MQTTPort)),
+			bytes.NewBufferString(fmt.Sprintf(edgeXCreateMQTTRegistrationJSON, cmd.MQTTHost, cmd.MQTTPort)),
 		)
 		if err != nil {
 			return err
