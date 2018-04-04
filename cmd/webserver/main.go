@@ -3,21 +3,49 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/gob"
 	"encoding/json"
+	"encoding/xml"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"math"
+	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
+	"strconv"
+	"strings"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/edgexfoundry/edgex-go/core/domain/models"
 	flags "github.com/jessevdk/go-flags"
+	"github.com/pkg/bson"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
+	"gonum.org/v1/plot/vg"
+	yaml "gopkg.in/yaml.v2"
+)
+
+const (
+	DEBUG            = true
+	HTTPUnknownError = iota
+	HTTPInvalidFormat
+	HTTPInvalidName
+	HTTPInvalidNumber
+	HTTPInvalidReading
+	HTTPPlotFailure
 )
 
 // Command is the command for application management
 type Command struct {
 	Start StartCmd `command:"start" description:"Start the server"`
+}
+
+// HTTPErrorResponse is for errors to be returned via HTTP
+type HTTPErrorResponse struct {
+	Error string `json:"error_msg" yaml:"error_msg"`
+	Code  int    `json:"error_code" yaml:"error_code"`
 }
 
 // The current input command
@@ -46,10 +74,6 @@ type StartCmd struct {
 
 // StartCmd will start running the web server
 func (cmd *StartCmd) Execute(args []string) (err error) {
-	// For safely dying
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
 	// Make an options struct for the mqtt client
 	connOpts := MQTT.NewClientOptions()
 
@@ -119,8 +143,12 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		fmt.Printf("Connected to %s\n", brokerHost)
 	}
 
-	// Wait for signals and disconnect safely
-	<-c
+	// Start up the web server
+	http.HandleFunc("/data", currentData)
+	http.HandleFunc("/plot", plotData)
+	err = http.ListenAndServe(fmt.Sprintf("%s:%d", cmd.HTTPHost, cmd.HTTPPort), nil)
+
+	// Gracefully disconnect the client and return an error
 	client.Disconnect(0)
 
 	return err
@@ -162,6 +190,164 @@ func onConnect(client MQTT.Client) {
 	fmt.Println("client connected")
 }
 
+// formatResponse will take the provided value and output it to the http response
+// in the specified format
+// It handles any encoding errors and returns
+// Current supported formats are :
+// - YAML
+// - JSON
+// - BSON
+// - GOB
+// - XML (note this doesn't work for all data types - notably maps don't serialize with XML)
+func formatResponse(format string, w http.ResponseWriter, val interface{}) {
+	// to force browser to display the page, useful in debugging
+	if DEBUG {
+		w.Header().Set("Content-Disposition", "inline")
+	}
+	errCode := HTTPUnknownError
+	status := http.StatusInternalServerError
+	var err error
+	switch strings.ToLower(format) {
+	case "":
+		// default to json if not specified
+		fallthrough
+	case "json":
+		err = json.NewEncoder(w).Encode(val)
+		// only set the content-type if we're successful
+		// if there was some error, we'll let the error handler set the content-type
+		if err == nil {
+			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		}
+	case "bson":
+		err = bson.NewEncoder(w).Encode(val)
+		// only set the content-type if we're successful
+		// if there was some error, we'll let the error handler set the content-type
+		if err == nil {
+			w.Header().Set("Content-Type", "application/bson; charset=UTF-8")
+		}
+	case "yaml":
+		err = yaml.NewEncoder(w).Encode(val)
+		if err == nil {
+			w.Header().Set("Content-Type", "text/x-yaml; charset=UTF-8")
+		}
+	case "gob":
+		err = gob.NewEncoder(w).Encode(val)
+		if err == nil {
+			w.Header().Set("Content-Type", "application/x-gob; charset=UTF-8")
+		}
+	case "xml":
+		err = xml.NewEncoder(w).Encode(val)
+		if err == nil {
+			w.Header().Set("Content-Type", "application/xml; charset=UTF-8")
+		}
+	default:
+		err = fmt.Errorf("invalid format: %v", format)
+		errCode = HTTPInvalidFormat
+		status = http.StatusBadRequest
+	}
+
+	if err != nil {
+		// some sort of error writing out the response
+		sendError(w, status, err, errCode)
+		log.Printf("error: failed to encode response: %+v\n", err)
+	}
+}
+
+// sendError will send the error details in JSON to the http response specified
+func sendError(w http.ResponseWriter, status int, err error, code int) {
+	w.WriteHeader(status)
+	// we always return error codes in json
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if err := json.NewEncoder(w).Encode(HTTPErrorResponse{
+		Error: err.Error(),
+		Code:  code,
+	}); err != nil {
+		// nothing more we can return to the client
+		log.Printf("error: failed to encode error response: %+v\n", err)
+	}
+}
+
+// handler for getting all current readings
+func currentData(w http.ResponseWriter, req *http.Request) {
+	// get format rest parameter
+	format := req.URL.Query().Get("format")
+	formatResponse(format, w, dataStore)
+}
+
+// handler for generating a plot of data
+func plotData(w http.ResponseWriter, req *http.Request) {
+	// get the name of the data stream to plot
+	queryParams := req.URL.Query()
+	name := queryParams.Get("name")
+
+	// ensure that the specified sensor name was specified, actually exists, and has data to plot
+	var ok bool
+	var readings []models.Reading
+	if readings, ok = dataStore[name]; name == "" || !ok || readings == nil || len(readings) == 0 {
+		sendError(w, http.StatusBadRequest, errors.New("invalid data source name"), HTTPInvalidName)
+		return
+	}
+
+	// get the number of readings to use
+	numStr := queryParams.Get("num")
+	var numToKeep uint64
+	numToKeep = math.MaxUint64
+	if numStr != "" {
+		// get the number of readings
+		var err error
+		if numToKeep, err = strconv.ParseUint(numStr, 10, 64); err != nil || numToKeep == 0 {
+			sendError(w, http.StatusBadRequest, err, HTTPInvalidNumber)
+			return
+		}
+	}
+
+	// Calculate the size of the returned array and the index to start with in the readings array
+	size := minUint64(numToKeep, uint64(len(readings)))
+	rStart := maxUint64(1, uint64(len(readings))-size)
+
+	// allocate the time and data values as a x,y list
+	pts := make(plotter.XYs, size)
+
+	// now go through the events and save them into separate x,y lists
+	var err error
+	for index, rIndex := uint64(0), rStart-1; index < size; index, rIndex = index+1, rIndex+1 {
+		// Save the time value as a float64, and parse the value string into a float64 as well
+		pts[index].X = float64(readings[rIndex].Origin)
+		pts[index].Y, err = strconv.ParseFloat(readings[rIndex].Value, 64)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, err, HTTPInvalidReading)
+			return
+		}
+	}
+
+	// now make a new plot object to write out the data to
+	p, err := plot.New()
+	if err != nil {
+		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
+		return
+	}
+
+	p.Title.Text = fmt.Sprintf("%s %s Data", readings[0].Device, name)
+	p.X.Tick.Marker = plot.TimeTicks{Format: "2006-01-02\n15:04"}
+	p.X.Label.Text = "Time"
+	p.Y.Label.Text = name
+
+	err = plotutil.AddLinePoints(p, name, pts)
+	if err != nil {
+		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
+		return
+	}
+
+	plotWriter, err := p.WriterTo(4*vg.Inch, 4*vg.Inch, "png")
+	if err != nil {
+		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png; charset=UTF-8")
+	plotWriter.WriteTo(w)
+}
+
 // command parser
 var parser = flags.NewParser(&cmd, flags.Default)
 
@@ -172,4 +358,18 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func minUint64(x, y uint64) uint64 {
+	if x < y {
+		return x
+	}
+	return y
+}
+
+func maxUint64(x, y uint64) uint64 {
+	if x > y {
+		return x
+	}
+	return y
 }
