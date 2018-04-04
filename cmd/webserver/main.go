@@ -57,7 +57,7 @@ type StartCmd struct {
 	Verbose bool `short:"v" long:"verbose" description:"Verbose output"`
 
 	// mqtt opts
-	MQTTPort       int    `short:"m" long:"mqtt-port" description:"MQTT server port to connect to" default:"1883"`
+	MQTTPort       uint   `short:"m" long:"mqtt-port" description:"MQTT server port to connect to" default:"1883"`
 	MQTTSSL        bool   `short:"e" long:"mqtt-ssl" description:"MQTT connection protocol (default no encryption)"`
 	MQTTHost       string `short:"b" long:"mqtt-host" description:"MQTT server hostname to connect to" default:"localhost"`
 	MQTTClientName string `short:"c" long:"mqtt-client" description:"MQTT clientname to use (default is automatically generated)"`
