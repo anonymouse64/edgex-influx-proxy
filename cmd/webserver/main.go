@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/gob"
@@ -8,6 +9,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -28,6 +30,25 @@ import (
 )
 
 const (
+	EdgeXCreateMQTTRegistrationJSON = `{
+	"name":"golang-server",
+	"enable":true,
+	"format":"JSON",
+	"destination": "MQTT_TOPIC",
+	"addressable": {
+	    "id": null,
+	    "created": 0,
+	    "modified": 0,
+	    "origin": 0,
+	    "name": "DesktopMQTT",
+	    "protocol": "TCP",
+	    "address": "%s",
+	    "port": %d,
+	    "path": null,
+	    "publisher": "EdgeXExportPublisher",
+	    "topic": "EdgeXDataTopic"
+	  }
+}`
 	HTTPUnknownError = iota
 	HTTPInvalidFormat
 	HTTPInvalidName
@@ -65,6 +86,11 @@ type StartCmd struct {
 	MQTTPassword   string `short:"p" long:"mqtt-passwd" description:"MQTT server password"`
 	MQTTQoS        int    `short:"q" long:"mqtt-qos" choice:"0" choice:"1" choice:"2" description:"MQTT Quality Of Service for the topic"`
 	MQTTSCertAuth  string `short:"i" long:"mqtt-cert" description:"MQTT secure certificate file"`
+
+	// edgex opts
+	EdgeXRegisterMQTT     bool   `short:"r" long:"edgex-export-distro-mqtt" description:"Edgex Export Distro registration"`
+	EdgeXExportDistroHost string `short:"d" long:"edgex-export-distro-host" description:"Edgex Export Distro hostname (for registering the MQTT server)"`
+	EdgeXExportDistroPort uint   `short:"f" long:"edgex-export-distro-port" description:"Edgex Export Distro port" default:"48071"`
 
 	// http opts
 	HTTPPort uint   `short:"s" long:"http-port" description:"HTTP server port to bind on" default:"8080"`
@@ -140,6 +166,27 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 			return token.Error()
 		}
 		fmt.Printf("Connected to %s\n", brokerHost)
+		defer client.Disconnect(0)
+	}
+
+	// Before starting the server, check if we need to register the MQTT server with Edgex Distro
+	if cmd.EdgeXRegisterMQTT {
+		res, err := http.Post(
+			fmt.Sprintf("http://%s:%d/api/v1/registration", cmd.EdgeXExportDistroHost, cmd.EdgeXExportDistroPort),
+			"application/json",
+			bytes.NewBufferString(fmt.Sprintf(EdgeXCreateMQTTRegistrationJSON, cmd.MQTTHost, cmd.MQTTPort)),
+		)
+		if err != nil {
+			return err
+		}
+
+		if res.StatusCode != 201 {
+			body, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("failed to register mqtt broker with export-distro: %s", body)
+		}
 	}
 
 	// Start up the web server
@@ -148,7 +195,6 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 	err = http.ListenAndServe(fmt.Sprintf("%s:%d", cmd.HTTPHost, cmd.HTTPPort), nil)
 
 	// Gracefully disconnect the client and return an error
-	client.Disconnect(0)
 
 	return err
 }
