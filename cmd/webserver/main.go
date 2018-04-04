@@ -47,12 +47,12 @@ const (
 	    "topic": "EdgeXDataTopic"
 	  }
 }`
-	HTTPUnknownError = iota
-	HTTPInvalidFormat
-	HTTPInvalidName
-	HTTPInvalidNumber
-	HTTPInvalidReading
-	HTTPPlotFailure
+	httpUnknownError = iota
+	httpInvalidFormat
+	httpInvalidName
+	httpInvalidNumber
+	httpInvalidReading
+	httpPlotFailure
 )
 
 // Command is the command for application management
@@ -188,7 +188,7 @@ func setAPICommonHeaders(w http.ResponseWriter) {
 // - XML (note this doesn't work for all data types - notably maps don't serialize with XML)
 func formatResponse(format string, w http.ResponseWriter, val interface{}) {
 	// to force browser to display the page, useful in debugging
-	errCode := HTTPUnknownError
+	errCode := httpUnknownError
 	status := http.StatusInternalServerError
 	var err error
 	var valBytes []byte
@@ -238,7 +238,7 @@ func formatResponse(format string, w http.ResponseWriter, val interface{}) {
 		}
 	default:
 		err = fmt.Errorf("invalid format: %v", format)
-		errCode = HTTPInvalidFormat
+		errCode = httpInvalidFormat
 		status = http.StatusBadRequest
 	}
 
@@ -280,7 +280,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	var ok bool
 	var readings []models.Reading
 	if readings, ok = dataStore[name]; name == "" || !ok || readings == nil || len(readings) == 0 {
-		sendError(w, http.StatusBadRequest, errors.New("invalid data source name"), HTTPInvalidName)
+		sendError(w, http.StatusBadRequest, errors.New("invalid data source name"), httpInvalidName)
 		return
 	}
 
@@ -292,7 +292,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 		// get the number of readings
 		var err error
 		if numToKeep, err = strconv.ParseUint(numStr, 10, 64); err != nil || numToKeep == 0 {
-			sendError(w, http.StatusBadRequest, err, HTTPInvalidNumber)
+			sendError(w, http.StatusBadRequest, err, httpInvalidNumber)
 			return
 		}
 	}
@@ -309,7 +309,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 			// it was specified, so parse it and save it
 			lim, err := strconv.ParseFloat(limStr, 64)
 			if err != nil {
-				sendError(w, http.StatusBadRequest, err, HTTPInvalidNumber)
+				sendError(w, http.StatusBadRequest, err, httpInvalidNumber)
 				return
 			}
 
@@ -336,7 +336,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 		pts[index].X = float64(readings[rIndex].Origin) / 1000.0
 		pts[index].Y, err = strconv.ParseFloat(readings[rIndex].Value, 64)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, err, HTTPInvalidReading)
+			sendError(w, http.StatusInternalServerError, err, httpInvalidReading)
 			return
 		}
 
@@ -352,7 +352,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	// now make a new plot object to write out the data to
 	p, err := plot.New()
 	if err != nil {
-		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
+		sendError(w, http.StatusInternalServerError, err, httpPlotFailure)
 		return
 	}
 
@@ -393,7 +393,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	// add the points to the plot with the name of the sensor
 	err = plotutil.AddLinePoints(p, name, pts)
 	if err != nil {
-		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
+		sendError(w, http.StatusInternalServerError, err, httpPlotFailure)
 		return
 	}
 
@@ -403,7 +403,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	//make a WriterTo that we can use to write the image out to the screen with
 	plotWriter, err := p.WriterTo(width, height, "svg")
 	if err != nil {
-		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
+		sendError(w, http.StatusInternalServerError, err, httpPlotFailure)
 		return
 	}
 
