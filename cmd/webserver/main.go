@@ -402,14 +402,18 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	}
 
 	//make a WriterTo that we can use to write the image out to the screen with
-	plotWriter, err := p.WriterTo(8*vg.Inch, 8*vg.Inch, "png")
+	height := 6 * vg.Inch
+	// golden ratio
+	width := 1.61803398875 * height
+	plotWriter, err := p.WriterTo(width, height, "svg")
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
 		return
 	}
 
 	// need to set the content-type for this as well
-	w.Header().Set("Content-Type", "image/png; charset=UTF-8")
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Content-Disposition", "inline")
 	plotWriter.WriteTo(w)
 }
 
