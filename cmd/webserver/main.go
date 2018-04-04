@@ -416,10 +416,10 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	//make a WriterTo that we can use to write the image out to the screen with
+	// use the golden ratio for the aspect ratio
 	height := 6 * vg.Inch
-	// golden ratio
-	width := 1.61803398875 * height
+	width := math.Phi * height
+	//make a WriterTo that we can use to write the image out to the screen with
 	plotWriter, err := p.WriterTo(width, height, "svg")
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
