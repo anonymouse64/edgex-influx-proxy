@@ -308,6 +308,10 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	// allocate the time and data values as a x,y list
 	pts := make(plotter.XYs, size)
 
+	maxY := 0.0
+
+	minY := 0.0
+
 	// now go through the events and save them into separate x,y lists
 	var err error
 	for index, rIndex := uint64(0), rStart-1; index < size; index, rIndex = index+1, rIndex+1 {
@@ -317,6 +321,14 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, err, HTTPInvalidReading)
 			return
+		}
+
+		if pts[index].Y > maxY {
+			maxY = pts[index].Y
+		}
+
+		if pts[index].Y < minY {
+			minY = pts[index].Y
 		}
 	}
 
@@ -332,18 +344,33 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	p.X.Label.Text = "Time"
 	p.Y.Label.Text = name
 
+	// set the axes so that there's some wiggle room above and below the plot
+	if minY > 0 {
+		p.Y.Min = 0.0
+	} else {
+		p.Y.Min = minY * 1.25
+	}
+	if maxY < 0 {
+		p.Y.Max = 0.0
+	} else {
+		p.Y.Max = maxY * 1.25
+	}
+
+	// add the points to the plot with the name of the sensor
 	err = plotutil.AddLinePoints(p, name, pts)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
 		return
 	}
 
-	plotWriter, err := p.WriterTo(4*vg.Inch, 4*vg.Inch, "png")
+	//make a WriterTo that we can use to write the image out to the screen with
+	plotWriter, err := p.WriterTo(8*vg.Inch, 8*vg.Inch, "png")
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err, HTTPPlotFailure)
 		return
 	}
 
+	// need to set the content-type for this as well
 	w.Header().Set("Content-Type", "image/png; charset=UTF-8")
 	plotWriter.WriteTo(w)
 }
