@@ -40,7 +40,7 @@ type StartCmd struct {
 	MQTTSCertAuth  string `short:"i" long:"mqtt-cert" description:"MQTT secure certificate file"`
 
 	// http opts
-	HTTPPort int    `short:"s" long:"http-port" description:"HTTP server port to bind on" default:"8080"`
+	HTTPPort uint   `short:"s" long:"http-port" description:"HTTP server port to bind on" default:"8080"`
 	HTTPHost string `short:"a" long:"http-host" description:"HTTP server hostname to bind on" default:"0.0.0.0"`
 }
 
