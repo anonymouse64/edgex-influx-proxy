@@ -71,13 +71,12 @@ func setupMQTTClient(cmd *StartCmd) (MQTT.Client, error) {
 	client := MQTT.NewClient(connOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
-	} else {
-		// Now subscribe to the topic
-		if token := client.Subscribe(cmd.MQTTTopic, byte(cmd.MQTTQoS), onMessageReceived); token.Wait() && token.Error() != nil {
-			return nil, token.Error()
-		}
-		fmt.Printf("Connected to %s\n", brokerHost)
 	}
+	// Now subscribe to the topic
+	if token := client.Subscribe(cmd.MQTTTopic, byte(cmd.MQTTQoS), onMessageReceived); token.Wait() && token.Error() != nil {
+		return nil, token.Error()
+	}
+	fmt.Printf("Connected to %s\n", brokerHost)
 
 	return client, nil
 }
