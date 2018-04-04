@@ -301,6 +301,27 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// we store the rest axis limit settings inside a map, so that to check if the value was set or not
+	// we can simply check to see if the key is inside the map
+	var axislimits = map[string]float64{}
+	// REST parameter names
+	axislimitNames := []string{"xmin", "xmax", "ymin", "ymax"}
+	for _, axisLimit := range axislimitNames {
+		// get the value from the queries
+		limStr := queryParams.Get(axisLimit)
+		if limStr != "" {
+			// it was specified, so parse it and save it
+			lim, err := strconv.ParseFloat(limStr, 64)
+			if err != nil {
+				sendError(w, http.StatusBadRequest, err, HTTPInvalidNumber)
+				return
+			}
+
+			// parsed successfully, save it
+			axislimits[axisLimit] = lim
+		}
+	}
+
 	// Calculate the size of the returned array and the index to start with in the readings array
 	size := minUint64(numToKeep, uint64(len(readings)))
 	rStart := maxUint64(1, uint64(len(readings))-size)
@@ -308,12 +329,12 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	// allocate the time and data values as a x,y list
 	pts := make(plotter.XYs, size)
 
+	// for keeping track of the min / max values - we use this to set the axis limits nicely
 	maxY := 0.0
-
 	minY := 0.0
 
-	// now go through the events and save them into separate x,y lists
 	var err error
+	// now go through the events and save them into separate x,y lists
 	for index, rIndex := uint64(0), rStart-1; index < size; index, rIndex = index+1, rIndex+1 {
 		// Save the time value as a float64, and parse the value string into a float64 as well
 		pts[index].X = float64(readings[rIndex].Origin) / 1000.0
@@ -344,16 +365,33 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	p.X.Label.Text = "Time"
 	p.Y.Label.Text = name
 
-	// set the axes so that there's some wiggle room above and below the plot
-	if minY > 0 {
-		p.Y.Min = 0.0
+	// set the y axis so that there's some wiggle room above and below the plot
+	// if the value was set via REST however, then just use that value
+	if lim, ok := axislimits["ymin"]; ok {
+		p.Y.Min = lim
 	} else {
-		p.Y.Min = minY * 1.25
+		if minY > 0 {
+			p.Y.Min = 0.0
+		} else {
+			p.Y.Min = minY * 1.25
+		}
 	}
-	if maxY < 0 {
-		p.Y.Max = 0.0
+	if lim, ok := axislimits["ymax"]; ok {
+		p.Y.Max = lim
 	} else {
-		p.Y.Max = maxY * 1.25
+		if maxY < 0 {
+			p.Y.Max = 0.0
+		} else {
+			p.Y.Max = maxY * 1.25
+		}
+	}
+
+	// for x axis limits, if it wasn't configured via REST, just let the plotting library figure it out
+	if lim, ok := axislimits["xmax"]; ok {
+		p.X.Max = lim
+	}
+	if lim, ok := axislimits["xmin"]; ok {
+		p.X.Min = lim
 	}
 
 	// add the points to the plot with the name of the sensor
