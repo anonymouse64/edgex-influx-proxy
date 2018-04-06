@@ -291,16 +291,60 @@ func currentData(w http.ResponseWriter, req *http.Request) {
 
 // handler for generating a plot of data
 func plotData(w http.ResponseWriter, req *http.Request) {
-	// get the name of the data stream to plot
 	queryParams := req.URL.Query()
-	name := queryParams.Get("name")
-
+	// get the name of the data stream to plot and
 	// ensure that the specified sensor name was specified, actually exists, and has data to plot
+	name := queryParams.Get("name")
 	var ok bool
 	var readings []models.Reading
 	if readings, ok = dataStore[name]; name == "" || !ok || readings == nil || len(readings) == 0 {
 		sendError(w, http.StatusBadRequest, errors.New("invalid data source name"), httpInvalidName)
 		return
+	}
+
+	// get the format to save the image as
+	format := queryParams.Get("format")
+	var contenttype string
+	switch strings.ToLower(format) {
+	case "":
+		// use SVG by default
+		format = "svg"
+		fallthrough
+	case "svg":
+		contenttype = "image/svg+xml"
+	// TODO : support more image formats
+	default:
+		sendError(w, http.StatusBadRequest, errors.New("invalid plot format"), httpInvalidFormat)
+		return
+	}
+
+	// get the image size parameter
+	imwidth := queryParams.Get("width")
+	var width vg.Length
+	var err error
+	if imwidth != "" {
+		// parse the image width
+		width, err = vg.ParseLength(imwidth)
+		if err != nil {
+			sendError(w, http.StatusBadRequest, err, httpInvalidFormat)
+		}
+	} else {
+		// use 4 inches as the width for the image
+		width = 4 * vg.Inch
+	}
+
+	// check the height if specified
+	imheight := queryParams.Get("height")
+	var height vg.Length
+	if imheight != "" {
+		// parse the image width
+		width, err = vg.ParseLength(imheight)
+		if err != nil {
+			sendError(w, http.StatusBadRequest, err, httpInvalidFormat)
+		}
+	} else {
+		// use golden ratio to calculate the height from the width
+		height = width / math.Phi
 	}
 
 	// get the number of readings to use
@@ -348,7 +392,6 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 	maxY := 0.0
 	minY := 0.0
 
-	var err error
 	// now go through the events and save them into separate x,y lists
 	for index, rIndex := uint64(0), rStart-1; index < size; index, rIndex = index+1, rIndex+1 {
 		// Save the time value as a float64, and parse the value string into a float64 as well
@@ -416,18 +459,15 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// use the golden ratio for the aspect ratio
-	height := 6 * vg.Inch
-	width := math.Phi * height
 	//make a WriterTo that we can use to write the image out to the screen with
-	plotWriter, err := p.WriterTo(width, height, "svg")
+	plotWriter, err := p.WriterTo(width, height, format)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, err, httpPlotFailure)
 		return
 	}
 
 	// need to set the content-type for this as well
-	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Content-Type", contenttype)
 	w.Header().Set("Content-Disposition", "inline")
 	setAPICommonHeaders(w)
 	plotWriter.WriteTo(w)
