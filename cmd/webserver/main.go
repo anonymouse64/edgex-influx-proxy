@@ -76,8 +76,8 @@ type StartCmd struct {
 
 	// mqtt opts
 	MQTTPort       uint   `short:"m" long:"mqtt-port" description:"MQTT server port to connect to" default:"1883"`
-	MQTTSSL        bool   `short:"e" long:"mqtt-ssl" description:"MQTT connection protocol (default no encryption)"`
-	MQTTHost       string `short:"b" long:"mqtt-host" description:"MQTT server hostname to connect to" default:"localhost"`
+	MQTTSSL        bool   `short:"s" long:"mqtt-ssl" description:"MQTT connection protocol (default no encryption)"`
+	MQTTHost       string `short:"b" long:"mqtt-broker" description:"MQTT server hostname to connect to" default:"localhost"`
 	MQTTClientName string `short:"c" long:"mqtt-client" description:"MQTT clientname to use (default is automatically generated)"`
 	MQTTTopic      string `short:"t" long:"mqtt-topic" description:"MQTT topic name to subscribe on" default:"EdgeXDataTopic"`
 	MQTTUsername   string `short:"u" long:"mqtt-user" description:"MQTT server username"`
@@ -86,12 +86,13 @@ type StartCmd struct {
 	MQTTSCertAuth  string `short:"i" long:"mqtt-cert" description:"MQTT secure certificate file"`
 
 	// edgex opts
-	EdgeXRegisterMQTT     bool   `short:"r" long:"edgex-export-distro-mqtt" description:"Edgex Export Distro registration"`
-	EdgeXExportDistroHost string `short:"d" long:"edgex-export-distro-host" description:"Edgex Export Distro hostname (for registering the MQTT server)"`
-	EdgeXExportDistroPort uint   `short:"f" long:"edgex-export-distro-port" description:"Edgex Export Distro port" default:"48071"`
+	EdgeXRegisterMQTT       bool   `short:"r" long:"edgex-export-distro-mqtt" description:"Enable Edgex Export Distro registration"`
+	EdgexDeleteRegistration bool   `short:"d" long:"edgex-export-distro-mqtt-clean" description:"Edgex Export Distro clean registration (delete existing registration before registering new one)"`
+	EdgeXExportDistroHost   string `short:"e" long:"edgex-export-distro-host" description:"Edgex Export Distro hostname (for registering the MQTT server)"`
+	EdgeXExportDistroPort   uint   `short:"f" long:"edgex-export-distro-port" description:"Edgex Export Distro port" default:"48071"`
 
 	// http opts
-	HTTPPort uint   `short:"s" long:"http-port" description:"HTTP server port to bind on" default:"8080"`
+	HTTPPort uint   `short:"h" long:"http-port" description:"HTTP server port to bind on" default:"8080"`
 	HTTPHost string `short:"a" long:"http-host" description:"HTTP server hostname to bind on" default:"0.0.0.0"`
 }
 
@@ -106,10 +107,28 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 
 	// Before starting the server, check if we need to register the MQTT server with Edgex Distro
 	if cmd.EdgeXRegisterMQTT {
+		edgexRegistrationEndpoint := fmt.Sprintf("http://%s:%d/api/v1/registration", cmd.EdgeXExportDistroHost, cmd.EdgeXExportDistroPort)
+		// since we're creating a new MQTT registration, we need to check if we should delete the current registration if it exists
+		if cmd.EdgexDeleteRegistration {
+			// make a new client + DELETE request against the registration endpoint with the registration name directory
+			client := &http.Client{}
+			req, err := http.NewRequest("DELETE", edgexRegistrationEndpoint+"/name/golang-server", nil)
+			if err != nil {
+				return err
+			}
+			_, err = client.Do(req)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Format the registration json with the mqtt host and the mqtt port
+		registerJSON := fmt.Sprintf(edgeXCreateMQTTRegistrationJSON, cmd.MQTTHost, cmd.MQTTPort)
+		// POST the request to export-client's registation endpoint with the formatted JSON as the body
 		res, err := http.Post(
-			fmt.Sprintf("http://%s:%d/api/v1/registration", cmd.EdgeXExportDistroHost, cmd.EdgeXExportDistroPort),
+			edgexRegistrationEndpoint,
 			"application/json",
-			bytes.NewBufferString(fmt.Sprintf(edgeXCreateMQTTRegistrationJSON, cmd.MQTTHost, cmd.MQTTPort)),
+			bytes.NewBufferString(registerJSON),
 		)
 		if err != nil {
 			return err
@@ -120,7 +139,7 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 			if err != nil {
 				return err
 			}
-			return fmt.Errorf("failed to register mqtt broker with export-distro: %s", body)
+			return fmt.Errorf("failed to register mqtt broker with export-distro (status code : %d): %s", res.StatusCode, body)
 		}
 	}
 
