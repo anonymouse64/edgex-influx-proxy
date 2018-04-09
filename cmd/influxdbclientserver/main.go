@@ -191,7 +191,7 @@ func sendEventToInflux(event models.Event) {
 
 		// Make the map of metadata for this reading (i.e. "tags" in influxdb parlance)
 		tags := map[string]string{
-		// "id": reading.Id.Hex(),
+			"id": reading.Id.Hex(),
 		}
 
 		// Make a map for the reading values (i.e "fields" in influxdb parlance) and
