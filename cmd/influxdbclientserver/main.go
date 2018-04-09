@@ -148,9 +148,36 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		}
 	}
 
-	// start the HTTP server
-	http.HandleFunc("/edgex", readingData)
+	// confirm that the influx db opts are correct
+
+	// Make a new HTTP client connection to influxdb
+	influxClient, err := influx.NewHTTPClient(influx.HTTPConfig{
+		Addr: "http://localhost:8086",
+	})
+
+	if err != nil {
+		return err
+	}
+
+	defer influxClient.Close()
+
+	ptConfig := influx.BatchPointsConfig{
+		Database:  "edgex",
+		Precision: "us",
+	}
+
+	// start the HTTP server passing the influxClient in as a parameter for all
+	http.HandleFunc("/edgex", timeInfluxData(influxClient, ptConfig))
 	return http.ListenAndServe(fmt.Sprintf("%s:%d", cmd.HTTPHost, cmd.HTTPPort), nil)
+}
+
+func timeInfluxData(influxClient influx.Client, ptConfig influx.BatchPointsConfig) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// time the function and output how long it took as well as the method
+		start := time.Now()
+		readingData(w, r, influxClient, ptConfig)
+		log.Printf("%s %s %d us\n", r.URL.Path, r.Method, time.Since(start)/time.Microsecond)
+	}
 }
 
 func genNewClientID() string {
@@ -158,7 +185,7 @@ func genNewClientID() string {
 	return "unique"
 }
 
-func readingData(w http.ResponseWriter, req *http.Request) {
+func readingData(w http.ResponseWriter, req *http.Request, influxClient influx.Client, ptConfig influx.BatchPointsConfig) {
 	// make sure that the method is a post
 	if strings.ToUpper(req.Method) != "POST" {
 		// error only post is supported, add Allow header with just POST
@@ -184,27 +211,13 @@ func readingData(w http.ResponseWriter, req *http.Request) {
 	// we send the event's readings to influxdb
 	// this is because we don't need to block this http request with the result of sending
 	// to influx
-	go sendEventToInflux(event)
+	go sendEventToInflux(influxClient, ptConfig, event)
 	w.WriteHeader(http.StatusOK)
 }
 
-// TODO: this should parse the message from edgex and save it into an in memory database, etc.
-func sendEventToInflux(event models.Event) {
-	// Make a new HTTP client connection to influxdb
-	influxClient, err := influx.NewHTTPClient(influx.HTTPConfig{
-		Addr: "http://localhost:8086",
-	})
-	if err != nil {
-		// TODO : setup an error channel and send this error to it
-		log.Printf("error creating InfluxDB Client: %+v\n", err)
-	}
-	defer influxClient.Close()
-
-	// Make a new set of batch points for this message
-	bp, _ := influx.NewBatchPoints(influx.BatchPointsConfig{
-		Database:  "edgex",
-		Precision: "us",
-	})
+func sendEventToInflux(influxClient influx.Client, ptConfig influx.BatchPointsConfig, event models.Event) {
+	// Make a new set of batch points for this event
+	bp, _ := influx.NewBatchPoints(ptConfig)
 
 	// Add all readings into batch influxdb points
 	for _, reading := range event.Readings {
@@ -256,7 +269,7 @@ func sendEventToInflux(event models.Event) {
 	}
 
 	// finally write all these points out to influx
-	err = influxClient.Write(bp)
+	err := influxClient.Write(bp)
 	if err != nil {
 		log.Printf("error writing points to influx: %+v\n", err)
 	}
