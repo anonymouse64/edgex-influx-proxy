@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"net"
 	"strconv"
@@ -166,7 +167,7 @@ func readingData(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		_, err := w.Write([]byte("invalid request, only POST supported"))
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "error writing error response")
+			log.Printf("error writing error response")
 		}
 		return
 	}
@@ -195,7 +196,7 @@ func sendEventToInflux(event models.Event) {
 	})
 	if err != nil {
 		// TODO : setup an error channel and send this error to it
-		fmt.Fprintf(os.Stderr, "error creating InfluxDB Client: %+v\n", err)
+		log.Printf("error creating InfluxDB Client: %+v\n", err)
 	}
 	defer influxClient.Close()
 
@@ -247,7 +248,7 @@ func sendEventToInflux(event models.Event) {
 		)
 		if err != nil {
 			// TODO : send error via channel
-			fmt.Fprintf(os.Stderr, "error creating reading point: %+v\n", err)
+			log.Printf("error creating reading point: %+v\n", err)
 		}
 
 		// Add it to the batch set
@@ -257,7 +258,7 @@ func sendEventToInflux(event models.Event) {
 	// finally write all these points out to influx
 	err = influxClient.Write(bp)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error writing points to influx: %+v\n", err)
+		log.Printf("error writing points to influx: %+v\n", err)
 	}
 }
 
@@ -301,6 +302,7 @@ var parser = flags.NewParser(&cmd, flags.Default)
 
 // empty - the command execution happens in *.Execute methods
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	_, err := parser.Parse()
 	if err != nil {
 		os.Exit(1)
