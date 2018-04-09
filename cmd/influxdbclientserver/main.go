@@ -73,13 +73,19 @@ type StartCmd struct {
 
 	// edgex opts
 	EdgeXRegisterRESTClient bool   `short:"r" long:"edgex-export-distro-rest" description:"Enable Edgex Export Distro registration"`
-	EdgexDeleteRegistration bool   `short:"d" long:"edgex-export-distro-rest-clean" description:"Edgex Export Distro clean registration (delete existing registration before registering new one)"`
+	EdgexDeleteRegistration bool   `short:"c" long:"edgex-export-distro-rest-clean" description:"Edgex Export Distro clean registration (delete existing registration before registering new one)"`
 	EdgeXExportDistroHost   string `short:"e" long:"edgex-export-distro-host" description:"Edgex Export Distro hostname (for registering the REST client)"`
 	EdgeXExportDistroPort   uint   `short:"f" long:"edgex-export-distro-port" description:"Edgex Export Distro port" default:"48071"`
 
 	// http opts
-	HTTPPort uint   `short:"h" long:"http-port" description:"HTTP server port to bind on" default:"8080"`
+	HTTPPort uint   `short:"p" long:"http-port" description:"HTTP server port to bind on" default:"8080"`
 	HTTPHost string `short:"a" long:"http-host" description:"HTTP server hostname to bind on"`
+
+	// influx opts
+	InfluxPort        uint   `short:"s" long:"influx-port" description:"InfluxDB port" default:"8086"`
+	InfluxHost        string `short:"i" long:"influx-host" description:"InfluxDB hostname" default:"localhost"`
+	InfluxDBName      string `short:"n" long:"influx-db-name" description:"InfluxDB database to upload to" default:"edgex"`
+	InfluxDBPrecision string `short:"t" long:"influx-db-precision" description:"InfluxDB precision to use when uploading" choice:"ns" choice:"us" choice:"ms" choice:"s"`
 }
 
 // Execute of StartCmd will start running the web server
@@ -152,7 +158,7 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 
 	// Make a new HTTP client connection to influxdb
 	influxClient, err := influx.NewHTTPClient(influx.HTTPConfig{
-		Addr: "http://localhost:8086",
+		Addr: fmt.Sprintf("http://%s:%d", cmd.InfluxHost, cmd.InfluxPort),
 	})
 
 	if err != nil {
@@ -162,8 +168,8 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 	defer influxClient.Close()
 
 	ptConfig := influx.BatchPointsConfig{
-		Database:  "edgex",
-		Precision: "us",
+		Database:  cmd.InfluxDBName,
+		Precision: cmd.InfluxDBPrecision,
 	}
 
 	// start the HTTP server passing the influxClient in as a parameter for all
