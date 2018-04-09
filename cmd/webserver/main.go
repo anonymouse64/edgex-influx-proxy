@@ -143,6 +143,9 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 
 	// Start up the web server
 	http.HandleFunc("/data", currentData)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/index.html")
+	})
 	http.HandleFunc("/plot", plotData)
 	err = http.ListenAndServe(fmt.Sprintf("%s:%d", cmd.HTTPHost, cmd.HTTPPort), nil)
 

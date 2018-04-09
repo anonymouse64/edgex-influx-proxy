@@ -1,0 +1,70 @@
+<html>
+	<script language="javascript">
+	function updateImage() {
+		num =  Math.random();
+		obj1 = document.i1;
+		obj1.src = obj1.src + "&x=" + num;
+		obj2 = document.i2;
+		obj2.src = obj2.src + "&x=" + num;
+		obj3 = document.i3;
+		obj3.src = obj3.src + "&x=" + num;
+		obj4 = document.i4;
+		obj4.src = obj4.src + "&x=" + num;
+		obj5 = document.i5;
+		obj5.src = obj5.src + "&x=" + num;
+		obj6 = document.i6;
+		obj6.src = obj6.src + "&x=" + num;
+		obj8 = document.i8;
+		obj8.src = obj8.src + "&x=" + num;
+		obj9 = document.i9;
+		obj9.src = obj9.src + "&x=" + num;
+		setTimeout("updateImage()",1000);
+	}
+	</script>
+	<head>
+		<title>Refreshing an image</title>
+	</head>
+	<body onload="updateImage()">
+		<p>Welcome to a dynamic plot, marvel as the image refreshes while the rest of the page does not!</p>
+		<table style="width:100%">
+			<tr>
+				<th>JC.RR5.NAE9.ConfRoom.Padre.Island01</th>
+			</tr>
+			<tr>
+				<td><img src="plot?name=AnalogInput_3000290" name="i1"></td>
+				<td><img src="plot?name=AnalogOutput_3000289" name="i2"></td>
+			</tr>
+		</table>
+		<table style="width:100%">		
+			<tr>
+				<th>KMC.BAC-121036CE01</th>
+			</tr>
+			<tr>
+				<td><img src="plot?name=AnalogValue_20" name="i3"></td>
+				<td><img src="plot?name=AnalogValue_21" name="i4"></td>
+				<td><img src="plot?name=AnalogValue_22" name="i5"></td>
+				<td><img src="plot?name=AnalogValue_40" name="i6"></td>
+			</tr>
+		</table>
+		<table style="width:100%">
+			<tr>
+				<th>GS1-AC-Drive01</th>
+			</tr>
+			<tr>
+				<td><img src="plot?name=HoldingRegister_8454" name="i8"></td>
+				<td><img src="plot?name=HoldingRegister_8455" name="i9"></td>
+			</tr>
+		</table>
+		<!-- 
+			<img src="plot?name=AnalogInput_3000290" name="1">
+			<img src="plot?name=AnalogOutput_3000289" name="2">
+			<img src="plot?name=AnalogValue_20" name="3">
+			<img src="plot?name=AnalogValue_21" name="4">
+			<img src="plot?name=AnalogValue_22" name="5">
+			<img src="plot?name=AnalogValue_40" name="6">
+			<img src="plot?name=HoldingRegister_2331" name="7">
+			<img src="plot?name=HoldingRegister_8454" name="8">
+			<img src="plot?name=HoldingRegister_8455" name="9">
+		-->
+	</body>
+</html>
