@@ -477,7 +477,7 @@ func plotData(w http.ResponseWriter, req *http.Request) {
 // command parser
 var parser = flags.NewParser(&cmd, flags.Default)
 
-// empty - the command execution happens in *.Execute methods
+// note this looks empty - the command execution happens in *.Execute methods
 func main() {
 	dataStore = make(map[string][]models.Reading)
 	_, err := parser.Parse()
@@ -486,6 +486,7 @@ func main() {
 	}
 }
 
+// minUint64 is a helper function used in axis limit determinations
 func minUint64(x, y uint64) uint64 {
 	if x < y {
 		return x
@@ -493,6 +494,7 @@ func minUint64(x, y uint64) uint64 {
 	return y
 }
 
+// maxUint64 is a helper function used in axis limit determinations
 func maxUint64(x, y uint64) uint64 {
 	if x > y {
 		return x
