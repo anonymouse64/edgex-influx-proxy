@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -82,17 +83,17 @@ type StartCmd struct {
 
 // Execute of StartCmd will start running the web server
 func (cmd *StartCmd) Execute(args []string) (err error) {
-	// Confirm the HTTPHost and HTTPPort settings
+	// Confirm the HTTPPort isn't 0 (cases where it's less than 0 are handled by the flags library, as it's declared as a uint)
 	if cmd.HTTPPort == 0 {
 		return fmt.Errorf("invalid port number")
 	}
 
-	// Before starting the server, check if we need to register this REST server with Edgex Distro
+	// Before starting the server, check if we need to register this REST server as a client with Edgex Distro
 	if cmd.EdgeXRegisterRESTClient {
 		edgexRegistrationEndpoint := fmt.Sprintf("http://%s:%d/api/v1/registration", cmd.EdgeXExportDistroHost, cmd.EdgeXExportDistroPort)
-		// since we're creating a new REST registration, we need to check if we should delete the current registration if it exists
+		// Since we're creating a new REST registration, check if we should delete the current registration first
 		if cmd.EdgexDeleteRegistration {
-			// make a new client + DELETE request against the registration endpoint with the registration name directory
+			// Make a new client + DELETE request against the registration endpoint with the registration name directory
 			client := &http.Client{}
 			req, err := http.NewRequest("DELETE", edgexRegistrationEndpoint+"/name/golang-server", nil)
 			if err != nil {
@@ -104,11 +105,29 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 			}
 		}
 
-		// because the export-distro service needs to make a network connection to this machine, and may be on a different machine than this one
-		// we need to check to make sure that if the host for this server was specified as
+		// Because the export-distro service needs to make a network connection to this machine, and may be on a different machine than this one
+		// we need to find the ip address that edgex should use when connecting to this machine dynamically, as the hostname specified on the command line
+		// may be something like localhost, etc.
+		// To handle this, we make a connection to the edgex distro host specified, and then look at the local address used by that socket connection
+		// this also handles the case where there's some kind of proxy, but obviously that proxy needs to be setup to forward data from edgex to this server
+		// but that's a whole different problem
+		conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", cmd.EdgeXExportDistroHost, cmd.EdgeXExportDistroPort))
+		if err != nil {
+			return err
+		}
 
-		// Format the registration json with this server's http host and port
-		registerJSON := fmt.Sprintf(edgeXCreateRESTRegistrationJSON, cmd.HTTPHost, cmd.HTTPPort)
+		// Cast the address to a UDP address to get the IP as a net.IP
+		localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
+
+		// don't defer closing the connection because if successful, we never actually exit this function when we start listening for new HTTP connections
+		conn.Close()
+
+		if !ok {
+			return fmt.Errorf("invalid address object: %+v", conn.LocalAddr())
+		}
+
+		// Format the registration json with the IP address we just found for this server and the specified port we bind on
+		registerJSON := fmt.Sprintf(edgeXCreateRESTRegistrationJSON, localAddr.IP.String(), cmd.HTTPPort)
 		// POST the request to export-client's registation endpoint with the formatted JSON as the body
 		res, err := http.Post(
 			edgexRegistrationEndpoint,
