@@ -113,6 +113,61 @@ func checkConfig(cfg *ServerConfig) error {
 	}
 }
 
+// TomlConfigKeys returns all toml keys in the config struct
+func TomlConfigKeys(tomlFile string) ([]string, *toml.Tree, error) {
+	tree, err := toml.LoadFile(tomlFile)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	leaveNames := make([]string, 0, 100)
+	recurseLeaves(tree, "", &leaveNames)
+	return leaveNames, tree, nil
+}
+
+// recurseLeaves follows all leaves of a toml.Tree, getting all possible key values
+// that can be used
+func recurseLeaves(tree *toml.Tree, prefix string, leaves *[]string) {
+	// Iterate over all branches of this tree, checking if each branch is a leaf
+	// or a subtree, recursing on subtrees
+	for _, branchName := range tree.Keys() {
+		branch := tree.Get(branchName)
+		if subtree, ok := branch.(*toml.Tree); !ok {
+			// This branch is a leaf - add it to the list of leaves
+			leavesSlice := *leaves
+			*leaves = append(leavesSlice, prefix+"."+branchName)
+		} else {
+			// This branch has more leaves - recurse into it
+			if prefix == "" {
+				// Don't include the prefix - this is the first call
+				recurseLeaves(subtree, branchName, leaves)
+			} else {
+				// Include the prefix - this is a recursed call
+				recurseLeaves(subtree, prefix+"."+branchName, leaves)
+			}
+		}
+	}
+}
+
+func SetTreeValues(valmap map[string]interface{}, tree *toml.Tree) (*ServerConfig, error) {
+	// iterate over the values, setting them inside the tree
+	for key, val := range valmap {
+		tree.Set(key, val)
+	}
+
+	// marshal the tree to toml bytes, then unmarshal the bytes into the struct
+	var cfg ServerConfig
+	treeString, err := tree.ToTomlString()
+	if err != nil {
+		return nil, err
+	}
+	err = toml.Unmarshal([]byte(treeString), &cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
 // default values for the config
 func defaultConfig() *ServerConfig {
 	return &ServerConfig{
