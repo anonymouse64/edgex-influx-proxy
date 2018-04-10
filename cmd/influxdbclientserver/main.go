@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"net"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -65,9 +66,61 @@ var currentCmd Command
 
 // ConfigCmd is for a set of commands working with the config file programmatically
 type ConfigCmd struct {
-	Check CheckConfigCmd `command:"check" descripttion:"Check a configuration file"`
-	Set   SetConfigCmd   `command:"set" description:"Set configuration values in a file"`
-	Get   GetConfigCmd   `command:"get" description:"Get configuration values from a file"`
+	Check      CheckConfigCmd  `command:"check" descripttion:"Check a configuration file"`
+	SnapUpdate UpdateConfigCmd `command:"update" description:"Update the configuration"`
+	Set        SetConfigCmd    `command:"set" description:"Set values in the configuration file"`
+	Get        GetConfigCmd    `command:"get" description:"Get values from the configuration file"`
+}
+
+// UpdateConfigCmd is a command for updating a config file from snapd/snapctl environment values
+type UpdateConfigCmd struct{}
+
+// Execute of UpdateConfigCmd will update a config file using values from snapd / snapctl
+func (cmd *UpdateConfigCmd) Execute(args []string) (err error) {
+	// List all toml keys from the config struct using the config file specified
+	tomlKeys, tree, err := config.TomlConfigKeys(currentCmd.ConfigFile)
+	if err != nil {
+		return err
+	}
+
+	// Get all the values of these keys from snapd
+	snapValues, err := getSnapKeyValues(tomlKeys)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := config.SetTreeValues(snapValues, tree)
+	if err != nil {
+		return err
+	}
+
+	// Finally write out the config to the file
+	err = config.WriteConfig(currentCmd.ConfigFile, cfg)
+	if err != nil {
+		return err
+	}
+
+	return
+}
+
+// getSnapKeyValues queries snapctl for all key values at once as JSON, and returns the corresponding values
+func getSnapKeyValues(keys []string) (map[string]interface{}, error) {
+	returnMap := make(map[string]interface{})
+
+	// get all values from snap at once as a json document
+	snapCmd := exec.Command("snapctl", append([]string{"get", "-d"}, keys...)...)
+	out, err := snapCmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarashal the json into the map, and return it
+	err = json.Unmarshal(out, &returnMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return returnMap, nil
 }
 
 // SetConfigCmd is a command for setting config values in the config file
