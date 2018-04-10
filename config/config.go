@@ -100,14 +100,14 @@ func checkConfig(cfg *ServerConfig) error {
 	case cfg.InfluxConfig.Port < 1:
 		return fmt.Errorf("influx port %d is invalid", cfg.InfluxConfig.Port)
 	// only check the edgex port if we need to register the server as a REST client
-	case cfg.EdgeXConfig.RegisterRESTClient && cfg.EdgeXConfig.Port < 1:
-		return fmt.Errorf("edgex export-distro port %d is invalid", cfg.EdgeXConfig.Port)
+	case cfg.EdgeXConfig.RegisterRESTClient && cfg.EdgeXConfig.ExportDistroPort < 1:
+		return fmt.Errorf("edgex export-distro port %d is invalid", cfg.EdgeXConfig.ExportDistroPort)
 	// check the database name
 	case cfg.InfluxConfig.DBName == "":
 		return fmt.Errorf("influx dbname %s is invalid", cfg.InfluxConfig.DBName)
 	// check the database precision
-	case validDBPrecision(cfg.InfluxConfig.DBPrecision):
-		return fmt.Errorf("influx db precision %s is invalid", cfg.InfluxConfig.DBName)
+	case !validDBPrecision(cfg.InfluxConfig.DBPrecision):
+		return fmt.Errorf("influx db precision %s is invalid", cfg.InfluxConfig.DBPrecision)
 	default:
 		return nil
 	}
