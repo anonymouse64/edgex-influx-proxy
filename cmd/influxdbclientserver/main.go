@@ -135,6 +135,7 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 
 		// Format the registration json with the IP address we just found for this server and the specified port we bind on
 		registerJSON := fmt.Sprintf(edgeXCreateRESTRegistrationJSON, localAddr.IP.String(), cmd.HTTPPort)
+
 		// POST the request to export-client's registation endpoint with the formatted JSON as the body
 		res, err := http.Post(
 			edgexRegistrationEndpoint,
@@ -154,8 +155,6 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		}
 	}
 
-	// confirm that the influx db opts are correct
-
 	// Make a new HTTP client connection to influxdb
 	influxClient, err := influx.NewHTTPClient(influx.HTTPConfig{
 		Addr: fmt.Sprintf("http://%s:%d", cmd.InfluxHost, cmd.InfluxPort),
@@ -165,6 +164,8 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		return err
 	}
 
+	// we only close the client once the function returns, as we don't return from this function unless error, but we will keep
+	// using the influx client until an error happens
 	defer influxClient.Close()
 
 	ptConfig := influx.BatchPointsConfig{
