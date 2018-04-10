@@ -7,24 +7,30 @@ import (
 	toml "github.com/pelletier/go-toml"
 )
 
+type edgeXConfig struct {
+	RegisterRESTClient bool   `toml:"register"`
+	CleanRegistration  bool   `toml:"clean-register"`
+	ExportDistroHost   string `toml:"exporthost"`
+	ExportDistroPort   int    `toml:"exportport"`
+}
+
+type httpConfig struct {
+	Port int    `toml:"port"`
+	Host string `toml:"host"`
+}
+
+type influxConfig struct {
+	Port        int    `toml:"port"`
+	Host        string `toml:"host"`
+	DBName      string `toml:"dbname"`
+	DBPrecision string `toml:"dbprecision"`
+}
+
 // ServerConfig holds all of the config values
 type ServerConfig struct {
-	HTTPConfig struct {
-		Port int    `toml:"port"`
-		Host string `toml:"host"`
-	} `toml:"http"`
-	InfluxConfig struct {
-		Port        int    `toml:"port"`
-		Host        string `toml:"host"`
-		DBName      string `toml:"dbname"`
-		DBPrecision string `toml:"dbprecision"`
-	} `toml:"influx"`
-	EdgeXConfig struct {
-		RegisterRESTClient bool   `toml:"register"`
-		CleanRegistration  bool   `toml:"clean-register"`
-		ExportDistroHost   string `toml:"exporthost"`
-		ExportDistroPort   int    `toml:"exportport"`
-	} `toml:"edgex"`
+	HTTPConfig   httpConfig   `toml:"http"`
+	InfluxConfig influxConfig `toml:"influx"`
+	EdgeXConfig  edgeXConfig  `toml:"edgex"`
 }
 
 // Config is the current server config
@@ -50,7 +56,7 @@ func LoadConfig(file string) error {
 }
 
 // WriteConfig will write out the specified config to the file
-func WriteConfig(file string, config *ServerConfig) error {
+func WriteConfig(file string, userconfig *ServerConfig) error {
 	f, err := os.Create(file)
 	if err != nil {
 		return err
@@ -60,11 +66,11 @@ func WriteConfig(file string, config *ServerConfig) error {
 	// Check the specified config, if it is nil, then
 	// use the global one
 	var cfgToUse *ServerConfig
-	if config == nil {
+	if userconfig == nil {
 		// use the global one
 		cfgToUse = Config
 	} else {
-		cfgToUse = config
+		cfgToUse = userconfig
 	}
 
 	// encode the config to the file
@@ -110,21 +116,21 @@ func checkConfig(cfg *ServerConfig) error {
 // default values for the config
 func defaultConfig() *ServerConfig {
 	return &ServerConfig{
-		HTTPConfig{
+		HTTPConfig: httpConfig{
 			Port: 8080,
 			Host: "",
 		},
-		InfluxConfig{
+		InfluxConfig: influxConfig{
 			Host:        "localhost",
 			Port:        8086,
 			DBName:      "edgex",
 			DBPrecision: "ns",
 		},
-		EdgeXConfig{
+		EdgeXConfig: edgeXConfig{
 			RegisterRESTClient: true,
 			CleanRegistration:  true,
 			ExportDistroHost:   "localhost",
-			ExportDistroPort:   "48071",
+			ExportDistroPort:   48071,
 		},
 	}
 }
