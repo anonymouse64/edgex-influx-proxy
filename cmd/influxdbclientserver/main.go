@@ -82,7 +82,7 @@ type SetConfigCmd struct {
 // TODO: not implemented yet
 func (cmd *SetConfigCmd) Execute(args []string) (err error) {
 	// Load the config file
-	err = config.LoadConfig(cmd.ConfigFile)
+	err = config.LoadConfig(currentCmd.ConfigFile)
 	if err != nil {
 		return
 	}
@@ -103,7 +103,7 @@ type GetConfigCmd struct {
 // TODO: not implemented yet
 func (cmd *GetConfigCmd) Execute(args []string) (err error) {
 	// Load the config file
-	err = config.LoadConfig(cmd.ConfigFile)
+	err = config.LoadConfig(currentCmd.ConfigFile)
 	if err != nil {
 		return
 	}
@@ -123,7 +123,7 @@ func (cmd *CheckConfigCmd) Execute(args []string) (err error) {
 		// file doesn't exist
 		if cmd.WriteNewFile {
 			// write out a new file then
-			return config.WriteConfig(file, nil)
+			return config.WriteConfig(currentCmd.ConfigFile, nil)
 		} else {
 			return fmt.Errorf("config file %s doesn't exist", currentCmd.ConfigFile)
 		}
@@ -137,16 +137,20 @@ type StartCmd struct{}
 
 // Execute of StartCmd will start running the web server
 func (cmd *StartCmd) Execute(args []string) (err error) {
-	// Confirm the HTTPPort isn't 0 (cases where it's less than 0 are handled by the flags library, as it's declared as a uint)
-	if cmd.HTTPPort == 0 {
-		return fmt.Errorf("invalid port number")
+	err = config.LoadConfig(currentCmd.ConfigFile)
+	if err != nil {
+		return err
 	}
 
+	edgexConfig := config.Config.EdgeXConfig
+	httpConfig := config.Config.HTTPConfig
+	influxConfig := config.Config.InfluxConfig
+
 	// Before starting the server, check if we need to register this REST server as a client with Edgex Distro
-	if cmd.EdgeXRegisterRESTClient {
-		edgexRegistrationEndpoint := fmt.Sprintf("http://%s:%d/api/v1/registration", cmd.EdgeXExportDistroHost, cmd.EdgeXExportDistroPort)
+	if edgexConfig.RegisterRESTClient {
+		edgexRegistrationEndpoint := fmt.Sprintf("http://%s:%d/api/v1/registration", edgexConfig.ExportDistroHost, edgexConfig.ExportDistroPort)
 		// Since we're creating a new REST registration, check if we should delete the current registration first
-		if cmd.EdgexDeleteRegistration {
+		if edgexConfig.CleanRegistration {
 			// Make a new client + DELETE request against the registration endpoint with the registration name directory
 			client := &http.Client{}
 			req, err := http.NewRequest("DELETE", edgexRegistrationEndpoint+"/name/golang-server", nil)
@@ -165,7 +169,7 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		// To handle this, we make a connection to the edgex distro host specified, and then look at the local address used by that socket connection
 		// this also handles the case where there's some kind of proxy, but obviously that proxy needs to be setup to forward data from edgex to this server
 		// but that's a whole different problem
-		conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", cmd.EdgeXExportDistroHost, cmd.EdgeXExportDistroPort))
+		conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", edgexConfig.ExportDistroHost, edgexConfig.ExportDistroPort))
 		if err != nil {
 			return err
 		}
@@ -181,7 +185,7 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		}
 
 		// Format the registration json with the IP address we just found for this server and the specified port we bind on
-		registerJSON := fmt.Sprintf(edgeXCreateRESTRegistrationJSON, localAddr.IP.String(), cmd.HTTPPort)
+		registerJSON := fmt.Sprintf(edgeXCreateRESTRegistrationJSON, localAddr.IP.String(), httpConfig.Port)
 
 		// POST the request to export-client's registation endpoint with the formatted JSON as the body
 		res, err := http.Post(
@@ -204,7 +208,7 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 
 	// Make a new HTTP client connection to influxdb
 	influxClient, err := influx.NewHTTPClient(influx.HTTPConfig{
-		Addr: fmt.Sprintf("http://%s:%d", cmd.InfluxHost, cmd.InfluxPort),
+		Addr: fmt.Sprintf("http://%s:%d", influxConfig.Host, influxConfig.Port),
 	})
 
 	if err != nil {
@@ -216,13 +220,13 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 	defer influxClient.Close()
 
 	ptConfig := influx.BatchPointsConfig{
-		Database:  cmd.InfluxDBName,
-		Precision: cmd.InfluxDBPrecision,
+		Database:  influxConfig.DBName,
+		Precision: influxConfig.DBPrecision,
 	}
 
 	// start the HTTP server passing the influxClient in as a parameter for all
 	http.HandleFunc("/edgex", timeInfluxData(influxClient, ptConfig))
-	return http.ListenAndServe(fmt.Sprintf("%s:%d", cmd.HTTPHost, cmd.HTTPPort), nil)
+	return http.ListenAndServe(fmt.Sprintf("%s:%d", httpConfig.Host, httpConfig.Port), nil)
 }
 
 func timeInfluxData(influxClient influx.Client, ptConfig influx.BatchPointsConfig) func(http.ResponseWriter, *http.Request) {
