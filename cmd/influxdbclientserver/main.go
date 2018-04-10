@@ -248,9 +248,10 @@ func sendEventToInflux(influxClient influx.Client, ptConfig influx.BatchPointsCo
 		}
 
 		// Calculate the unix time from the origin time in the reading
-		unixTime := float64(reading.Origin) / 1000.0
+		// note that the origin time is in milliseconds
+		unixTime := float64(reading.Origin) / float64(time.Second/time.Millisecond)
 		unixTimeSec := math.Floor(unixTime)
-		unixTimeNSec := int64((unixTime - unixTimeSec) * 1000000000.0)
+		unixTimeNSec := int64((unixTime - unixTimeSec) * float64(time.Second/time.Nanosecond))
 
 		// Make the reading point for this device
 		pt, err := influx.NewPoint(
