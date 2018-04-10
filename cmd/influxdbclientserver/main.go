@@ -187,11 +187,6 @@ func timeInfluxData(influxClient influx.Client, ptConfig influx.BatchPointsConfi
 	}
 }
 
-func genNewClientID() string {
-	// TODO: generate randomly
-	return "unique"
-}
-
 func readingData(w http.ResponseWriter, req *http.Request, influxClient influx.Client, ptConfig influx.BatchPointsConfig) {
 	// make sure that the method is a post
 	if strings.ToUpper(req.Method) != "POST" {
