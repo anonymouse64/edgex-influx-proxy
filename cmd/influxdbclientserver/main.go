@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/anonymouse67/edgex-web-demo/config"
 	"github.com/edgexfoundry/edgex-go/core/domain/models"
 	influx "github.com/influxdata/influxdb/client/v2"
 	flags "github.com/jessevdk/go-flags"
@@ -60,13 +61,16 @@ type Command struct {
 }
 
 // The current input command
-var cmd Command
+var currentCmd Command
 
+// ConfigCmd is for a set of commands working with the config file programmatically
 type ConfigCmd struct {
-	Set SetConfigCmd `command:"set" description:"Set configuration values in a file"`
-	Get GetConfigCmd `command:"get" description:"Get configuration values from a file"`
+	Check CheckConfigCmd `command:"check" descripttion:"Check a configuration file"`
+	Set   SetConfigCmd   `command:"set" description:"Set configuration values in a file"`
+	Get   GetConfigCmd   `command:"get" description:"Get configuration values from a file"`
 }
 
+// SetConfigCmd is a command for setting config values in the config file
 type SetConfigCmd struct {
 	Args struct {
 		Key   string `positional-arg-name:"key"`
@@ -74,10 +78,8 @@ type SetConfigCmd struct {
 	} `positional-args:"yes" required:"yes"`
 }
 
-// StartCmd command for creating an application
-type StartCmd struct{}
-
 // Execute of SetConfigCmd will set config values from the command line inside the config file
+// TODO: not implemented yet
 func (cmd *SetConfigCmd) Execute(args []string) (err error) {
 	// Load the config file
 	err = config.LoadConfig(cmd.ConfigFile)
@@ -89,6 +91,49 @@ func (cmd *SetConfigCmd) Execute(args []string) (err error) {
 
 	return
 }
+
+// GetConfigCmd is a command for getting config values from the config file
+type GetConfigCmd struct {
+	Args struct {
+		Key string `positional-arg-name:"key"`
+	} `positional-args:"yes" required:"yes"`
+}
+
+// Execute of GetConfigCmd will print off config values from the command line as specified in the config file
+// TODO: not implemented yet
+func (cmd *GetConfigCmd) Execute(args []string) (err error) {
+	// Load the config file
+	err = config.LoadConfig(cmd.ConfigFile)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+type CheckConfigCmd struct {
+	WriteNewFile bool `short:"w" long:"write-new" description:"Whether to write a new config if the specified file doesn't exist"`
+}
+
+// Execute of CheckConfigCmd checks if the specified config file exists, and if it doesn't it creates one
+//
+func (cmd *CheckConfigCmd) Execute(args []string) (err error) {
+	// first check if the specified file exists
+	if _, err = os.Stat(currentCmd.ConfigFile); os.IsNotExist(err) {
+		// file doesn't exist
+		if cmd.WriteNewFile {
+			// write out a new file then
+			return config.WriteConfig(file, nil)
+		} else {
+			return fmt.Errorf("config file %s doesn't exist", currentCmd.ConfigFile)
+		}
+	}
+	// otherwise the file exists, so load it
+	return config.LoadConfig(currentCmd.ConfigFile)
+}
+
+// StartCmd command for creating an application
+type StartCmd struct{}
 
 // Execute of StartCmd will start running the web server
 func (cmd *StartCmd) Execute(args []string) (err error) {
@@ -316,7 +361,7 @@ func parseValueType(valueStr string) (typeStr DataValueType, boolVal bool, float
 }
 
 // command parser
-var parser = flags.NewParser(&cmd, flags.Default)
+var parser = flags.NewParser(&currentCmd, flags.Default)
 
 // empty - the command execution happens in *.Execute methods
 func main() {
