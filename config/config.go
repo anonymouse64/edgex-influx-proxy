@@ -28,7 +28,7 @@ type ServerConfig struct {
 }
 
 // Config is the current server config
-var Config *ServerConfig
+var Config = defaultConfig()
 
 // LoadConfig will read in the file, loading the config, and perform validation on the config
 func LoadConfig(file string) error {
@@ -39,7 +39,7 @@ func LoadConfig(file string) error {
 	}
 
 	// make a new decoder with the file
-	// and decode the file
+	// and decode the file into the global config
 	err = toml.NewDecoder(f).Decode(Config)
 	if err != nil {
 		return err
@@ -47,6 +47,28 @@ func LoadConfig(file string) error {
 
 	// validate the config
 	return checkConfig(Config)
+}
+
+// WriteConfig will write out the specified config to the file
+func WriteConfig(file string, config *ServerConfig) error {
+	f, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Check the specified config, if it is nil, then
+	// use the global one
+	var cfgToUse *ServerConfig
+	if config == nil {
+		// use the global one
+		cfgToUse = Config
+	} else {
+		cfgToUse = config
+	}
+
+	// encode the config to the file
+	return toml.NewEncoder(f).Encode(cfgToUse)
 }
 
 // checks that the precision for the database is correctly specified
