@@ -11,16 +11,26 @@ parts:
   go:
     source-tag: go1.10.1
     source-depth: 1
-  influxdb:
+  influxproxy:
     after: [go]
     source: .
     plugin: go
-    go-importpath: github.com/anonymouse67/edgex-web-demo
+    go-importpath: github.com/anonymouse64/edgex-web-demo
     build-packages: [mercurial]
+  scripts:
+    source: scripts
+    plugin: dump
+    organize:
+      '*.sh': bin/
+    prime:
+      - bin
+
 
 apps:
   influxproxy:
-    command: bin/influxdbclientserver
+    command: bin/runserver.sh
+    daemon: simple
+    restart-condition: always
     plugs:
       - network-bind
       - network
