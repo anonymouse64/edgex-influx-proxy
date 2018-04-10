@@ -54,38 +54,40 @@ const (
 
 // Command is the command for application management
 type Command struct {
-	Start StartCmd `command:"start" description:"Start the server"`
-}
-
-// HTTPErrorResponse is for errors to be returned via HTTP
-type HTTPErrorResponse struct {
-	Error string `json:"error_msg" yaml:"error_msg"`
-	Code  int    `json:"error_code" yaml:"error_code"`
+	Start      StartCmd  `command:"start" description:"Start the server"`
+	Config     ConfigCmd `command:"config" description:"Change or get config values"`
+	ConfigFile string    `short:"c" long:"config-file" description:"Configuration file to use" required:"yes"`
 }
 
 // The current input command
 var cmd Command
 
+type ConfigCmd struct {
+	Set SetConfigCmd `command:"set" description:"Set configuration values in a file"`
+	Get GetConfigCmd `command:"get" description:"Get configuration values from a file"`
+}
+
+type SetConfigCmd struct {
+	Args struct {
+		Key   string `positional-arg-name:"key"`
+		Value string `positional-arg-name:"value"`
+	} `positional-args:"yes" required:"yes"`
+}
+
 // StartCmd command for creating an application
-type StartCmd struct {
-	// general opts
-	Verbose bool `short:"v" long:"verbose" description:"Verbose output"`
+type StartCmd struct{}
 
-	// edgex opts
-	EdgeXRegisterRESTClient bool   `short:"r" long:"edgex-export-distro-rest" description:"Enable Edgex Export Distro registration"`
-	EdgexDeleteRegistration bool   `short:"c" long:"edgex-export-distro-rest-clean" description:"Edgex Export Distro clean registration (delete existing registration before registering new one)"`
-	EdgeXExportDistroHost   string `short:"e" long:"edgex-export-distro-host" description:"Edgex Export Distro hostname (for registering the REST client)"`
-	EdgeXExportDistroPort   uint   `short:"f" long:"edgex-export-distro-port" description:"Edgex Export Distro port" default:"48071"`
+// Execute of SetConfigCmd will set config values from the command line inside the config file
+func (cmd *SetConfigCmd) Execute(args []string) (err error) {
+	// Load the config file
+	err = config.LoadConfig(cmd.ConfigFile)
+	if err != nil {
+		return
+	}
 
-	// http opts
-	HTTPPort uint   `short:"p" long:"http-port" description:"HTTP server port to bind on" default:"8080"`
-	HTTPHost string `short:"a" long:"http-host" description:"HTTP server hostname to bind on"`
+	// Now get the keys into the struct to set the values in the struct
 
-	// influx opts
-	InfluxPort        uint   `short:"s" long:"influx-port" description:"InfluxDB port" default:"8086"`
-	InfluxHost        string `short:"i" long:"influx-host" description:"InfluxDB hostname" default:"localhost"`
-	InfluxDBName      string `short:"n" long:"influx-db-name" description:"InfluxDB database to upload to" default:"edgex"`
-	InfluxDBPrecision string `short:"t" long:"influx-db-precision" description:"InfluxDB precision to use when uploading" choice:"ns" choice:"us" choice:"ms" choice:"s"`
+	return
 }
 
 // Execute of StartCmd will start running the web server
