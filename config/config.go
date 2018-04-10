@@ -74,7 +74,7 @@ func WriteConfig(file string, userconfig *ServerConfig) error {
 	}
 
 	// encode the config to the file
-	return toml.NewEncoder(f).Encode(cfgToUse)
+	return toml.NewEncoder(f).Encode(*cfgToUse)
 }
 
 // checks that the precision for the database is correctly specified
