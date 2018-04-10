@@ -127,7 +127,7 @@ func defaultConfig() *ServerConfig {
 			DBPrecision: "ns",
 		},
 		EdgeXConfig: edgeXConfig{
-			RegisterRESTClient: true,
+			RegisterRESTClient: false,
 			CleanRegistration:  true,
 			ExportDistroHost:   "localhost",
 			ExportDistroPort:   48071,
