@@ -15,7 +15,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/anonymouse67/edgex-web-demo/config"
+	"github.com/anonymouse64/edgex-web-demo/config"
 	"github.com/edgexfoundry/edgex-go/core/domain/models"
 	influx "github.com/influxdata/influxdb/client/v2"
 	flags "github.com/jessevdk/go-flags"
