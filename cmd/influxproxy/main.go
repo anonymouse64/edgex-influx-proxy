@@ -105,8 +105,6 @@ func (cmd *UpdateConfigCmd) Execute(args []string) (err error) {
 
 // getSnapKeyValues queries snapctl for all key values at once as JSON, and returns the corresponding values
 func getSnapKeyValues(keys []string) (map[string]interface{}, error) {
-	returnMap := make(map[string]interface{})
-
 	// get all values from snap at once as a json document
 	snapCmd := exec.Command("snapctl", append([]string{"get", "-d"}, keys...)...)
 	out, err := snapCmd.Output()
@@ -114,7 +112,8 @@ func getSnapKeyValues(keys []string) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	// Unmarashal the json into the map, and return it
+	// Unmarshal the json into the map, and return it
+	returnMap := make(map[string]interface{})
 	err = json.Unmarshal(out, &returnMap)
 	if err != nil {
 		return nil, err
