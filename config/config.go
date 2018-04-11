@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 
 	toml "github.com/pelletier/go-toml"
 )
@@ -151,8 +152,13 @@ func recurseLeaves(tree *toml.Tree, prefix string, leaves *[]string) {
 }
 
 func SetTreeValues(valmap map[string]interface{}, tree *toml.Tree) (*ServerConfig, error) {
+	allKeys := TomlConfigKeys(tree)
 	// iterate over the values, setting them inside the tree
 	for key, val := range valmap {
+		// check to make sure that this key exists
+		if !stringInSlice(strings.TrimSpace(key), allKeys) {
+			return nil, fmt.Errorf("invalid key %s", key)
+		}
 		// before setting the value, we need to check if the type of this key is an integer
 		// because if the key is an integer value, when we are provided the interface{}, the
 		// value we go to assign might actually be a float, because when we parse the values
@@ -229,4 +235,14 @@ func defaultConfig() *ServerConfig {
 			ExportDistroPort:   48071,
 		},
 	}
+}
+
+// copied from https://stackoverflow.com/questions/15323767/does-golang-have-if-x-in-construct-similar-to-python
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
