@@ -78,13 +78,13 @@ type UpdateConfigCmd struct{}
 // Execute of UpdateConfigCmd will update a config file using values from snapd / snapctl
 func (cmd *UpdateConfigCmd) Execute(args []string) (err error) {
 	// List all toml keys from the config struct using the config file specified
-	tomlKeys, tree, err := config.TomlConfigKeys(currentCmd.ConfigFile)
+	tree, err := config.TomlConfigTree(currentCmd.ConfigFile)
 	if err != nil {
 		return err
 	}
 
 	// Get all the values of these keys from snapd
-	snapValues, err := getSnapKeyValues(tomlKeys)
+	snapValues, err := getSnapKeyValues(config.TomlConfigKeys(tree))
 	if err != nil {
 		return err
 	}
@@ -155,12 +155,13 @@ type GetConfigCmd struct {
 // Execute of GetConfigCmd will print off config values from the command line as specified in the config file
 // TODO: not implemented yet
 func (cmd *GetConfigCmd) Execute(args []string) (err error) {
-	// Load the config file
-	err = config.LoadConfig(currentCmd.ConfigFile)
+	tree, err := config.TomlConfigTree(currentCmd.ConfigFile)
 	if err != nil {
-		return
+		return err
 	}
 
+	// Get the key from the tree
+	fmt.Println(tree.Get(cmd.Args.Key))
 	return
 }
 

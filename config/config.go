@@ -113,16 +113,16 @@ func checkConfig(cfg *ServerConfig) error {
 	}
 }
 
-// TomlConfigKeys returns all toml keys in the config struct
-func TomlConfigKeys(tomlFile string) ([]string, *toml.Tree, error) {
-	tree, err := toml.LoadFile(tomlFile)
-	if err != nil {
-		return nil, nil, err
-	}
+// TomlConfigTree is a simple wrapper function to get the toml tree from a config file
+func TomlConfigTree(tomlFile string) (*toml.Tree, error) {
+	return toml.LoadFile(tomlFile)
+}
 
+// TomlConfigKeys returns all toml keys in the config struct
+func TomlConfigKeys(tree *toml.Tree) []string {
 	leaveNames := make([]string, 0, 100)
 	recurseLeaves(tree, "", &leaveNames)
-	return leaveNames, tree, nil
+	return leaveNames
 }
 
 // recurseLeaves follows all leaves of a toml.Tree, getting all possible key values
