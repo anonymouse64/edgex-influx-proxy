@@ -237,8 +237,16 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 			return fmt.Errorf("invalid address object: %+v", conn.LocalAddr())
 		}
 
+		// in some instances the localhost ip may be returned as ipv6 ::1, so we should turn all loopback addresses to just localhost for compatibility
+		var thisAddr string
+		if localAddr.IP.IsLoopback() {
+			thisAddr = "localhost"
+		} else {
+			thisAddr = localAddr.IP.String()
+		}
+
 		// Format the registration json with the IP address we just found for this server and the specified port we bind on
-		registerJSON := fmt.Sprintf(edgeXCreateRESTRegistrationJSON, localAddr.IP.String(), httpConfig.Port)
+		registerJSON := fmt.Sprintf(edgeXCreateRESTRegistrationJSON, thisAddr, httpConfig.Port)
 
 		// POST the request to export-client's registation endpoint with the formatted JSON as the body
 		res, err := http.Post(
