@@ -46,13 +46,13 @@ const (
 	httpPlotFailure
 )
 
-type DataValueType int
+type dataValueType int
 
 const (
-	BoolType DataValueType = iota
-	IntType
-	FloatType
-	StringType
+	boolType dataValueType = iota
+	intType
+	floatType
+	stringType
 )
 
 type edgeXConfig struct {
@@ -471,13 +471,13 @@ func sendEventToInflux(influxClient influx.Client, ptConfig influx.BatchPointsCo
 		fields := make(map[string]interface{})
 		readingType, boolVal, floatVal, intVal := parseValueType(reading.Value)
 		switch readingType {
-		case BoolType:
+		case boolType:
 			fields[reading.Name] = boolVal
-		case IntType:
+		case intType:
 			fields[reading.Name] = intVal
-		case FloatType:
+		case floatType:
 			fields[reading.Name] = floatVal
-		case StringType:
+		case stringType:
 			fields[reading.Name] = reading.Value
 		}
 
@@ -513,15 +513,15 @@ func sendEventToInflux(influxClient influx.Client, ptConfig influx.BatchPointsCo
 }
 
 // parseValueType attempts to parse the value of the string value into a proper go type
-func parseValueType(valueStr string) (typeStr DataValueType, boolVal bool, floatVal float64, intVal int64) {
+func parseValueType(valueStr string) (typeStr dataValueType, boolVal bool, floatVal float64, intVal int64) {
 	// first check for boolean
 	fixedStr := strings.TrimSpace(strings.ToLower(valueStr))
 	if fixedStr == "true" {
-		typeStr = BoolType
+		typeStr = boolType
 		boolVal = true
 		return
 	} else if fixedStr == "false" {
-		typeStr = BoolType
+		typeStr = boolType
 		boolVal = false
 		return
 	}
@@ -530,7 +530,7 @@ func parseValueType(valueStr string) (typeStr DataValueType, boolVal bool, float
 	intVal, err := strconv.ParseInt(fixedStr, 10, 64)
 	if err == nil {
 		// then it's an int value
-		typeStr = IntType
+		typeStr = intType
 		return
 	}
 
@@ -538,12 +538,12 @@ func parseValueType(valueStr string) (typeStr DataValueType, boolVal bool, float
 	floatVal, err = strconv.ParseFloat(fixedStr, 64)
 	if err == nil {
 		// success, value is a float
-		typeStr = FloatType
+		typeStr = floatType
 		return
 	}
 
 	// if we get here, it's not any scalar numeric value, so just assume it's meant as a string
-	typeStr = StringType
+	typeStr = stringType
 	return
 }
 
