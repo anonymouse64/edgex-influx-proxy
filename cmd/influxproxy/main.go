@@ -17,7 +17,7 @@ import (
 	"os"
 
 	"github.com/anonymouse64/edgex-web-demo/config"
-	"github.com/edgexfoundry/edgex-go/core/domain/models"
+	"github.com/edgexfoundry/go-mod-core-contracts/models"
 	influx "github.com/influxdata/influxdb/client/v2"
 	flags "github.com/jessevdk/go-flags"
 )
@@ -338,7 +338,7 @@ func sendEventToInflux(influxClient influx.Client, ptConfig influx.BatchPointsCo
 
 		// Make the map of metadata for this reading (i.e. "tags" in influxdb parlance)
 		tags := map[string]string{
-			"id": reading.Id.Hex(),
+			"id": reading.Id,
 		}
 
 		// Make a map for the reading values (i.e "fields" in influxdb parlance) and

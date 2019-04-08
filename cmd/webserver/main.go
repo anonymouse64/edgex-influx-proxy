@@ -17,7 +17,7 @@ import (
 	"strings"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
-	"github.com/edgexfoundry/edgex-go/core/domain/models"
+	"github.com/edgexfoundry/go-mod-core-contracts/models"
 	flags "github.com/jessevdk/go-flags"
 	"github.com/pkg/bson"
 	"gonum.org/v1/plot"
