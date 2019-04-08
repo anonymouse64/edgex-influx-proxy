@@ -16,10 +16,11 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/anonymouse64/edgex-web-demo/config"
+	tc "github.com/anonymouse64/configurator/tomlconfigurator"
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
 	influx "github.com/influxdata/influxdb/client/v2"
 	flags "github.com/jessevdk/go-flags"
+	"github.com/pelletier/go-toml"
 )
 
 const (
@@ -54,6 +55,102 @@ const (
 	StringType
 )
 
+type edgeXConfig struct {
+	RegisterRESTClient bool   `toml:"register"`
+	CleanRegistration  bool   `toml:"clean-register"`
+	ExportDistroHost   string `toml:"exporthost"`
+	ExportDistroPort   int    `toml:"exportport"`
+}
+
+type httpConfig struct {
+	Port int    `toml:"port"`
+	Host string `toml:"host"`
+}
+
+type influxConfig struct {
+	Port        int    `toml:"port"`
+	Host        string `toml:"host"`
+	DBName      string `toml:"dbname"`
+	DBPrecision string `toml:"dbprecision"`
+}
+
+// ServerConfig holds all of the config values
+type serverConfig struct {
+	HTTPConfig   httpConfig   `toml:"http"`
+	InfluxConfig influxConfig `toml:"influx"`
+	EdgeXConfig  edgeXConfig  `toml:"edgex"`
+}
+
+// Config is the current configuration for the server in memory
+var Config *serverConfig
+
+// checks that the precision for the database is correctly specified
+func validDBPrecision(prec string) bool {
+	switch prec {
+	case "ns",
+		"us",
+		"ms",
+		"s",
+		"":
+		return true
+	default:
+		return false
+	}
+}
+
+// checks various properties in the config to make sure they're usable
+func (s *serverConfig) Validate() error {
+	switch {
+	// check that ports are greater than 0
+	case s.HTTPConfig.Port < 1:
+		return fmt.Errorf("http port %d is invalid", s.HTTPConfig.Port)
+	case s.InfluxConfig.Port < 1:
+		return fmt.Errorf("influx port %d is invalid", s.InfluxConfig.Port)
+	// only check the edgex port if we need to register the server as a REST client
+	case s.EdgeXConfig.RegisterRESTClient && s.EdgeXConfig.ExportDistroPort < 1:
+		return fmt.Errorf("edgex export-distro port %d is invalid", s.EdgeXConfig.ExportDistroPort)
+	// check the database name
+	case s.InfluxConfig.DBName == "":
+		return fmt.Errorf("influx dbname %s is invalid", s.InfluxConfig.DBName)
+	// check the database precision
+	case !validDBPrecision(s.InfluxConfig.DBPrecision):
+		return fmt.Errorf("influx db precision %s is invalid", s.InfluxConfig.DBPrecision)
+	default:
+		return nil
+	}
+}
+
+// SetDefault sets default values for the config
+func (s *serverConfig) SetDefault() error {
+	s.HTTPConfig.Port = 8080
+	s.InfluxConfig.Host = "localhost"
+	s.InfluxConfig.Port = 8086
+	s.InfluxConfig.DBName = "edgex"
+	s.InfluxConfig.DBPrecision = "ns"
+	s.EdgeXConfig.RegisterRESTClient = false
+	s.EdgeXConfig.CleanRegistration = true
+	s.EdgeXConfig.ExportDistroHost = "localhost"
+	s.EdgeXConfig.ExportDistroPort = 48071
+	return nil
+}
+
+// MarshalTOML marshals the config into bytes
+func (s *serverConfig) MarshalTOML() ([]byte, error) {
+	return toml.Marshal(*s)
+}
+
+// UnmarshalTOML unmarshals the toml bytes into the config
+func (s *serverConfig) UnmarshalTOML(bytes []byte) error {
+	return toml.Unmarshal(bytes, s)
+}
+
+func init() {
+	// initialize a default config here globally because then it simplifies
+	// the various command Execute() methods
+	Config = &serverConfig{}
+	Config.SetDefault()
+}
+
 // Command is the command for application management
 type Command struct {
 	Start      StartCmd  `command:"start" description:"Start the server"`
@@ -76,31 +173,32 @@ type ConfigCmd struct {
 type UpdateConfigCmd struct{}
 
 // Execute of UpdateConfigCmd will update a config file using values from snapd / snapctl
-func (cmd *UpdateConfigCmd) Execute(args []string) (err error) {
-	// List all toml keys from the config struct using the config file specified
-	tree, err := config.TomlConfigTree(currentCmd.ConfigFile)
+func (cmd *UpdateConfigCmd) Execute(args []string) error {
+	err := tc.LoadTomlConfigurator(currentCmd.ConfigFile, Config)
+	if err != nil {
+		return err
+	}
+
+	// Get all keys of the toml
+	keys, err := tc.TomlKeys(Config)
 	if err != nil {
 		return err
 	}
 
 	// Get all the values of these keys from snapd
-	snapValues, err := getSnapKeyValues(config.TomlConfigKeys(tree))
+	snapValues, err := getSnapKeyValues(keys)
 	if err != nil {
 		return err
 	}
 
-	cfg, err := config.SetTreeValues(snapValues, tree)
+	// Write the values into the config
+	err = tc.SetTomlConfiguratorKeyValues(snapValues, Config)
 	if err != nil {
 		return err
 	}
 
-	// Finally write out the config to the file
-	err = config.WriteConfig(currentCmd.ConfigFile, cfg)
-	if err != nil {
-		return err
-	}
-
-	return
+	// Finally write out the config to the config file file
+	return tc.WriteTomlConfigurator(currentCmd.ConfigFile, Config)
 }
 
 // getSnapKeyValues queries snapctl for all key values at once as JSON, and returns the corresponding values
@@ -132,16 +230,28 @@ type SetConfigCmd struct {
 
 // Execute of SetConfigCmd will set config values from the command line inside the config file
 // TODO: not implemented yet
-func (cmd *SetConfigCmd) Execute(args []string) (err error) {
-	// Load the config file
-	err = config.LoadConfig(currentCmd.ConfigFile)
+func (cmd *SetConfigCmd) Execute(args []string) error {
+	// assume the value is a single valid json value to parse it
+	var val interface{}
+	err := json.Unmarshal([]byte(cmd.Args.Value), &val)
 	if err != nil {
-		return
+		return err
 	}
 
-	// Now get the keys into the struct to set the values in the struct
+	// load the toml configuration so we can manipulate it
+	err = tc.LoadTomlConfigurator(currentCmd.ConfigFile, Config)
+	if err != nil {
+		return err
+	}
 
-	return
+	// try to set the value into the toml file using the key
+	err = tc.SetTomlConfiguratorKeyVal(Config, cmd.Args.Key, val)
+	if err != nil {
+		return err
+	}
+
+	// finally write the configuration back out to the file
+	return tc.WriteTomlConfigurator(currentCmd.ConfigFile, Config)
 }
 
 // GetConfigCmd is a command for getting config values from the config file
@@ -154,16 +264,25 @@ type GetConfigCmd struct {
 // Execute of GetConfigCmd will print off config values from the command line as specified in the config file
 // TODO: not implemented yet
 func (cmd *GetConfigCmd) Execute(args []string) (err error) {
-	tree, err := config.TomlConfigTree(currentCmd.ConfigFile)
+	// load the toml configuration so we can manipulate it
+	err = tc.LoadTomlConfigurator(currentCmd.ConfigFile, Config)
+	if err != nil {
+		return err
+	}
+
+	// try to set the value into the toml file using the key
+	val, err := tc.GetTomlConfiguratorKeyVal(Config, cmd.Args.Key)
 	if err != nil {
 		return err
 	}
 
 	// Get the key from the tree
-	fmt.Println(tree.Get(cmd.Args.Key))
+	fmt.Println(val)
 	return
 }
 
+// CheckConfigCmd is a command for verifying a config file is valid and optionally
+// creating a new one if the specified config file doesn't exist
 type CheckConfigCmd struct {
 	WriteNewFile bool `short:"w" long:"write-new" description:"Whether to write a new config if the specified file doesn't exist"`
 }
@@ -175,14 +294,16 @@ func (cmd *CheckConfigCmd) Execute(args []string) (err error) {
 	if _, err = os.Stat(currentCmd.ConfigFile); os.IsNotExist(err) {
 		// file doesn't exist
 		if cmd.WriteNewFile {
-			// write out a new file then
-			return config.WriteConfig(currentCmd.ConfigFile, nil)
-		} else {
-			return fmt.Errorf("config file %s doesn't exist", currentCmd.ConfigFile)
+			// write out a new file
+			return tc.WriteTomlConfigurator(currentCmd.ConfigFile, Config)
 		}
+		return fmt.Errorf(
+			"config file %s doesn't exist",
+			currentCmd.ConfigFile,
+		)
 	}
-	// otherwise the file exists, so load it
-	return config.LoadConfig(currentCmd.ConfigFile)
+	// otherwise the file exists, so load it to check it
+	return tc.LoadTomlConfigurator(currentCmd.ConfigFile, Config)
 }
 
 // StartCmd command for creating an application
@@ -190,14 +311,15 @@ type StartCmd struct{}
 
 // Execute of StartCmd will start running the web server
 func (cmd *StartCmd) Execute(args []string) (err error) {
-	err = config.LoadConfig(currentCmd.ConfigFile)
+	// load the configuration for the server
+	err = tc.LoadTomlConfigurator(currentCmd.ConfigFile, Config)
 	if err != nil {
 		return err
 	}
 
-	edgexConfig := config.Config.EdgeXConfig
-	httpConfig := config.Config.HTTPConfig
-	influxConfig := config.Config.InfluxConfig
+	edgexConfig := Config.EdgeXConfig
+	httpConfig := Config.HTTPConfig
+	influxConfig := Config.InfluxConfig
 
 	// Before starting the server, check if we need to register this REST server as a client with Edgex Distro
 	if edgexConfig.RegisterRESTClient {
