@@ -34,6 +34,7 @@ parts:
                 cp $ROOT_PROJECT_DIR/$dir $SNAPCRAFT_PART_SRC;;
             esac
           done
+          ;;
         *)
           # other build environments we will have a project dir that contains
           # only the files from the original project
