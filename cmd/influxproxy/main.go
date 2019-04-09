@@ -380,7 +380,11 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 			return err
 		}
 
-		if res.StatusCode != http.StatusCreated {
+		switch res.StatusCode {
+		case http.StatusCreated:
+			fallthrough
+		case http.StatusOK:
+		default:
 			body, err := ioutil.ReadAll(res.Body)
 			if err != nil {
 				return err
