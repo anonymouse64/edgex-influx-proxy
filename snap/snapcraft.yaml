@@ -20,9 +20,9 @@ parts:
       # go get -t -d -v ./... which fails because influxdb doesn't have the 
       # needed import path on the master branch which is what the go plugin
       # tries to use
-      ls $(dirname $(dirname $SNAPCRAFT_PART_SRC))
+      ls $(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))
       apt update && apt install tree 
-      tree $(dirname $(dirname $SNAPCRAFT_PART_SRC))
+      tree $(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))
       cp -r $(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))/project/* $SNAPCRAFT_PART_SRC
     override-build: |
       mkdir -p $SNAPCRAFT_PART_INSTALL/bin
