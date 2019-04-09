@@ -1,20 +1,19 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net"
+	"net/http"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
-
-	"bytes"
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"os"
 
 	tc "github.com/anonymouse64/configurator/tomlconfigurator"
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
