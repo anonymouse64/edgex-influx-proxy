@@ -28,25 +28,6 @@ import (
 )
 
 const (
-	edgeXCreateMQTTRegistrationJSON = `{
-	"name":"golang-server",
-	"enable":true,
-	"format":"JSON",
-	"destination": "MQTT_TOPIC",
-	"addressable": {
-	    "id": null,
-	    "created": 0,
-	    "modified": 0,
-	    "origin": 0,
-	    "name": "DesktopMQTT",
-	    "protocol": "TCP",
-	    "address": "%s",
-	    "port": %d,
-	    "path": null,
-	    "publisher": "EdgeXExportPublisher",
-	    "topic": "EdgeXDataTopic"
-	  }
-}`
 	httpUnknownError = iota
 	httpInvalidFormat
 	httpInvalidName
@@ -123,12 +104,29 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		}
 
 		// Format the registration json with the mqtt host and the mqtt port
-		registerJSON := fmt.Sprintf(edgeXCreateMQTTRegistrationJSON, cmd.MQTTHost, cmd.MQTTPort)
+		registerJSON, err := json.Marshal(models.Registration{
+			Name:        "golang-server",
+			Enable:      true,
+			Format:      models.FormatJSON,
+			Destination: "MQTT_TOPIC",
+			Addressable: models.Addressable{
+				Name:      "DesktopMQTT",
+				Protocol:  "TCP",
+				Address:   cmd.MQTTHost,
+				Port:      int(cmd.MQTTPort),
+				Publisher: "EdgeXExportPublisher",
+				Topic:     "EdgeXDataTopic",
+			},
+		})
+		if err != nil {
+			return err
+		}
+
 		// POST the request to export-client's registation endpoint with the formatted JSON as the body
 		res, err := http.Post(
 			edgexRegistrationEndpoint,
 			"application/json",
-			bytes.NewBufferString(registerJSON),
+			bytes.NewBuffer(registerJSON),
 		)
 		if err != nil {
 			return err

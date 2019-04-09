@@ -23,20 +23,6 @@ import (
 )
 
 const (
-	edgeXCreateRESTRegistrationJSON = `{
-	"name":"golang-server",
-	"enable":true,
-	"format":"JSON",
-	"destination": "REST_ENDPOINT",
-	"addressable": {
-	    "name": "DesktopREST",
-	    "protocol": "HTTP",
-   	    "method": "POST", 
-	    "address": "%s",
-	    "port": %d,
-	    "path": "/edgex"
-	  }
-}`
 	httpUnknownError = iota
 	httpInvalidFormat
 	httpInvalidName
@@ -366,14 +352,29 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 			thisAddr = localAddr.IP.String()
 		}
 
-		// Format the registration json with the IP address we just found for this server and the specified port we bind on
-		registerJSON := fmt.Sprintf(edgeXCreateRESTRegistrationJSON, thisAddr, httpConfig.Port)
+		registerJSON, err := json.Marshal(models.Registration{
+			Name:        "golang-server",
+			Enable:      true,
+			Format:      models.FormatJSON,
+			Destination: "REST_ENDPOINT",
+			Addressable: models.Addressable{
+				Name:       "DesktopREST",
+				Protocol:   "HTTP",
+				HTTPMethod: "POST",
+				Address:    thisAddr,
+				Port:       httpConfig.Port,
+				Path:       "/edgex",
+			},
+		})
+		if err != nil {
+			return err
+		}
 
 		// POST the request to export-client's registation endpoint with the formatted JSON as the body
 		res, err := http.Post(
 			edgexRegistrationEndpoint,
 			"application/json",
-			bytes.NewBufferString(registerJSON),
+			bytes.NewBuffer(registerJSON),
 		)
 		if err != nil {
 			return err
