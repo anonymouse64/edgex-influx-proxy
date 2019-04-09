@@ -13,7 +13,6 @@ parts:
   influxproxy:
     source: .
     plugin: go
-    go-importpath: github.com/anonymouse64/edgex-influx-proxy
     build-packages: [mercurial, git, build-essential]
     override-pull: |
       # we have to do this currently because the default go part does
