@@ -20,6 +20,7 @@ parts:
       # go get -t -d -v ./... which fails because influxdb doesn't have the 
       # needed import path on the master branch which is what the go plugin
       # tries to use
+      env
       ls $(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))
       apt update && apt install tree 
       tree $(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))
