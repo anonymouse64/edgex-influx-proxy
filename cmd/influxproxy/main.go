@@ -17,7 +17,7 @@ import (
 
 	tc "github.com/anonymouse64/configurator/tomlconfigurator"
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	influx "github.com/influxdata/influxdb/client/v2"
+	influx "github.com/influxdata/influxdb1-client/v2"
 	flags "github.com/jessevdk/go-flags"
 	"github.com/pelletier/go-toml"
 )
