@@ -31,7 +31,7 @@ parts:
               parts|prime|stage)
                 continue;;
               *)
-                cp $ROOT_PROJECT_DIR/$dir $SNAPCRAFT_PART_SRC;;
+                cp -r $ROOT_PROJECT_DIR/$dir $SNAPCRAFT_PART_SRC;;
             esac
           done
           ;;
