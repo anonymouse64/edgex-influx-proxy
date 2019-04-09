@@ -1,10 +1,13 @@
 name: edgex-influx-proxy
 version: '0.1'
-summary: Edgex export-distro translation to InfluxDB format
+title: EdgeX Foundry InfluxDB Proxy Server
+license: GPLv3
+summary: Proxy data from EdgeX device services to InfluxDB using export-distro
 base: core18
 description: |
-  edgex-influx-proxy provides a simple service that listens for EdgeX data from export-distro and 
-  formats and forwards that data into InfluxDB.
+  The EdgeX InfluxDB Proxy server provides a simple HTTP endpoint that is
+  registered with the export-distro EdgeX microservice, forwarding all event
+  readings to an InfluxDB server.
 
 grade: stable
 confinement: strict
