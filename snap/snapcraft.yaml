@@ -20,11 +20,26 @@ parts:
       # go get -t -d -v ./... which fails because influxdb doesn't have the 
       # needed import path on the master branch which is what the go plugin
       # tries to use
-      env
-      ls $(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))
-      apt update && apt install tree 
-      tree $(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))
-      cp -r $(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))/project/* $SNAPCRAFT_PART_SRC
+      ROOT_PROJECT_DIR=$(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))
+      case $SNAPCRAFT_BUILD_ENVIRONMENT in 
+        host)
+          # for host build env we don't have a project specific dir
+          # so we have to copy everything, filtering out the 
+          # snapcraft generated directories
+          for dir in $(ls $ROOT_PROJECT_DIR); do
+            case $dir in
+              parts|prime|stage)
+                continue;;
+              *)
+                cp $ROOT_PROJECT_DIR/$dir $SNAPCRAFT_PART_SRC;;
+            esac
+          done
+        *)
+          # other build environments we will have a project dir that contains
+          # only the files from the original project
+          cp -r $ROOT_PROJECT_DIR/project/* $SNAPCRAFT_PART_SRC
+          ;;
+      esac
     override-build: |
       mkdir -p $SNAPCRAFT_PART_INSTALL/bin
       cd $SNAPCRAFT_PART_SRC
