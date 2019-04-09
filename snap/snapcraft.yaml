@@ -1,6 +1,7 @@
 name: edgex-influx-proxy
 version: '0.1'
 summary: Edgex export-distro translation to InfluxDB format
+base: core18
 description: |
   edgex-influx-proxy provides a simple service that listens for EdgeX data from export-distro and 
   formats and forwards that data into InfluxDB.
@@ -9,15 +10,21 @@ grade: stable
 confinement: strict
 
 parts:
-  go:
-    source-tag: go1.10.1
-    source-depth: 1
   influxproxy:
-    after: [go]
     source: .
     plugin: go
     go-importpath: github.com/anonymouse64/edgex-influx-proxy
-    build-packages: [mercurial]
+    build-packages: [mercurial, git, build-essential]
+    override-pull: |
+      # we have to do this currently because the default go part does
+      # go get -t -d -v ./... which fails because influxdb doesn't have the 
+      # needed import path on the master branch which is what the go plugin
+      # tries to use
+      cp -r $(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))/project/* $SNAPCRAFT_PART_SRC
+    override-build: |
+      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
+      cd $SNAPCRAFT_PART_SRC
+      go build -o $SNAPCRAFT_PART_INSTALL/bin/influxproxy ./cmd/influxproxy
   scripts:
     source: scripts
     plugin: dump
@@ -25,7 +32,6 @@ parts:
       '*.sh': bin/
     prime:
       - bin
-
 
 apps:
   influxproxy:
