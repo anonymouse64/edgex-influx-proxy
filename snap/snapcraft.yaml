@@ -20,7 +20,7 @@ parts:
     plugin: go
     build-packages: [mercurial, git, build-essential]
     override-pull: |
-      # we have to do this currently because the default go part does
+      # we have to do this currently because the default go plugin does
       # go get -t -d -v ./... which fails because influxdb doesn't have the 
       # needed import path on the master branch which is what the go plugin
       # tries to use
