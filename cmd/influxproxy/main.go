@@ -141,6 +141,7 @@ type Command struct {
 	Start      StartCmd  `command:"start" description:"Start the server"`
 	Config     ConfigCmd `command:"config" description:"Change or get config values"`
 	ConfigFile string    `short:"c" long:"config-file" description:"Configuration file to use" required:"yes"`
+	Debug      bool      `short:"d" long:"debug" description:"Debugging output"`
 }
 
 // The current input command
@@ -311,15 +312,27 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 		edgexRegistrationEndpoint := fmt.Sprintf("http://%s:%d/api/v1/registration", edgexConfig.ExportDistroHost, edgexConfig.ExportDistroPort)
 		// Since we're creating a new REST registration, check if we should delete the current registration first
 		if edgexConfig.CleanRegistration {
+			if currentCmd.Debug {
+				log.Println("deleting previous export-client registration")
+			}
+
 			// Make a new client + DELETE request against the registration endpoint with the registration name directory
 			client := &http.Client{}
 			req, err := http.NewRequest("DELETE", edgexRegistrationEndpoint+"/name/golang-server", nil)
 			if err != nil {
 				return err
 			}
-			_, err = client.Do(req)
+			resp, err := client.Do(req)
 			if err != nil {
 				return err
+			}
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if currentCmd.Debug {
+				log.Printf("previous export-client registration deleted: %s", string(body))
 			}
 		}
 
@@ -380,15 +393,19 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 			return err
 		}
 
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			return err
+		}
+
 		switch res.StatusCode {
 		case http.StatusCreated:
 			fallthrough
 		case http.StatusOK:
-		default:
-			body, err := ioutil.ReadAll(res.Body)
-			if err != nil {
-				return err
+			if currentCmd.Debug {
+				log.Printf("created export-client registration, id is %s\n", string(body))
 			}
+		default:
 			return fmt.Errorf("failed to register REST endpoint with export-distro (status code : %d): %s", res.StatusCode, body)
 		}
 	}
@@ -400,6 +417,10 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 
 	if err != nil {
 		return err
+	}
+
+	if currentCmd.Debug {
+		log.Println("made influxClient")
 	}
 
 	// we only close the client once the function returns, as we don't return from this function unless error, but we will keep
