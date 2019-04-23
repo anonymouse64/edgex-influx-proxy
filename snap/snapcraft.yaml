@@ -1,7 +1,7 @@
 name: edgex-influx-proxy
 version: "replace-me"
 version-script: |
-  echo 1.0.0-$(git rev-parse --short HEAD)
+  echo 0.7.1-$(git rev-parse --short HEAD)
 title: EdgeX Foundry InfluxDB Proxy Server
 license: GPL-3.0
 summary: Proxy data from EdgeX device services to InfluxDB using export-distro
