@@ -16,7 +16,7 @@ import (
 	"time"
 
 	tc "github.com/anonymouse64/configurator/tomlconfigurator"
-	"github.com/edgexfoundry/go-mod-core-contracts/models"
+	"github.com/edgexfoundry/edgex-go/pkg/models"
 	influx "github.com/influxdata/influxdb1-client/v2"
 	flags "github.com/jessevdk/go-flags"
 	"github.com/pelletier/go-toml"
@@ -365,10 +365,26 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 			thisAddr = localAddr.IP.String()
 		}
 
-		registerJSON, err := json.Marshal(models.Registration{
+		// since this is built against delhi edgex-go pkgs, we don't have the
+		// registration object exposed - it lives inside internal/export/registration.go
+		// so to handle that we just create a similar struct definition here
+		// which matches that of what's in edgex-go
+		// note since this is being sent over json, we just drop all the
+		// ones that are marked omitempty in edgex-go
+		obj := struct {
+			Created     int64              `json:"created"`
+			Modified    int64              `json:"modified"`
+			Origin      int64              `json:"origin"`
+			Name        string             `json:"name,omitempty"`
+			Addressable models.Addressable `json:"addressable,omitempty"`
+			Format      string             `json:"format,omitempty"`
+			Enable      bool               `json:"enable"`
+			Destination string             `json:"destination,omitempty"`
+		}{
+			Origin:      time.Now().UnixNano() / int64(time.Millisecond),
 			Name:        "golang-server",
 			Enable:      true,
-			Format:      models.FormatJSON,
+			Format:      "JSON",
 			Destination: "REST_ENDPOINT",
 			Addressable: models.Addressable{
 				Name:       "DesktopREST",
@@ -378,7 +394,8 @@ func (cmd *StartCmd) Execute(args []string) (err error) {
 				Port:       httpConfig.Port,
 				Path:       "/edgex",
 			},
-		})
+		}
+		registerJSON, err := json.Marshal(obj)
 		if err != nil {
 			return err
 		}
@@ -485,7 +502,7 @@ func sendEventToInflux(influxClient influx.Client, ptConfig influx.BatchPointsCo
 
 		// Make the map of metadata for this reading (i.e. "tags" in influxdb parlance)
 		tags := map[string]string{
-			"id": reading.Id,
+			"id": reading.Id.Hex(),
 		}
 
 		// Make a map for the reading values (i.e "fields" in influxdb parlance) and
