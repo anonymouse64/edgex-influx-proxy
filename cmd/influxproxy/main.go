@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -582,6 +584,25 @@ func parseValueType(valueStr string) (typeStr dataValueType, boolVal bool, float
 		// success, value is a float
 		typeStr = floatType
 		return
+	}
+
+	// actually finally check for a floating point value encoded as base64
+	data, err := base64.StdEncoding.DecodeString(valueStr)
+	if err == nil {
+		switch len(data) {
+		case 4:
+			// float 32
+			typeStr = floatType
+			bits := binary.BigEndian.Uint32(data)
+			floatVal = float64(math.Float32frombits(bits))
+			return
+		case 8:
+			// float 64
+			typeStr = floatType
+			bits := binary.BigEndian.Uint64(data)
+			floatVal = math.Float64frombits(bits)
+			return
+		}
 	}
 
 	// if we get here, it's not any scalar numeric value, so just assume it's meant as a string
