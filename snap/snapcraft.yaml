@@ -15,9 +15,29 @@ grade: stable
 confinement: strict
 
 parts:
+  glide:
+    plugin: dump
+    source:
+      - on amd64: https://github.com/Masterminds/glide/releases/download/v0.12.3/glide-v0.12.3-linux-amd64.tar.gz
+      - else:
+        - on arm64: https://github.com/Masterminds/glide/releases/download/v0.12.3/glide-v0.12.3-linux-arm64.tar.gz
+        - else:
+          - on armhf: https://github.com/Masterminds/glide/releases/download/v0.12.3/glide-v0.12.3-linux-armv7.tar.gz
+          - else:
+            - on i386: https://github.com/Masterminds/glide/releases/download/v0.12.3/glide-v0.12.3-linux-386.tar.gz
+      - else fail
+    prime:
+      - -*
+    organize:
+      glide: bin/glide
+    stage:
+      - bin/glide
+
   influxproxy:
     source: .
+    after: [glide]
     plugin: go
+    go-channel: 1.11/stable
     build-packages: [mercurial, git, build-essential]
     override-pull: |
       # we have to do this currently because the default go plugin does
@@ -48,7 +68,17 @@ parts:
     override-build: |
       mkdir -p $SNAPCRAFT_PART_INSTALL/bin
       cd $SNAPCRAFT_PART_SRC
-      go build -o $SNAPCRAFT_PART_INSTALL/bin/influxproxy ./cmd/influxproxy
+      export GOPATH="$(pwd)/../build/.gopath"
+      mkdir -p "$GOPATH"
+      export PATH="$SNAPCRAFT_STAGE/bin:$GOPATH/bin:$PATH"
+      export GOROOT=$(go env GOROOT)
+      export GOIMPORTPATH="$GOPATH/src/github.com/anonymouse64/edgex-influx-proxy"
+      mkdir -p $GOIMPORTPATH
+      cp -r ./* $GOIMPORTPATH
+      cd $GOIMPORTPATH
+      glide cc
+      glide install
+      GO111MODULE=off go build -o $SNAPCRAFT_PART_INSTALL/bin/influxproxy ./cmd/influxproxy
   scripts:
     source: scripts
     plugin: dump
