@@ -11,6 +11,12 @@ description: |
   registered with the export-distro EdgeX microservice, forwarding all event
   readings to an InfluxDB server.
 
+architectures:
+  - build-on: amd64
+  - build-on: armhf
+  - build-on: arm64
+  - build-on: i386
+
 grade: stable
 confinement: strict
 
