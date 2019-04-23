@@ -2,3 +2,4 @@
 *.snap
 
 *.bz2
+vendor/
