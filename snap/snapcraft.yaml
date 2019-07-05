@@ -1,67 +1,84 @@
 name: edgex-influx-proxy
 version: "replace-me"
 version-script: |
-  echo 0.7.1-$(git rev-parse --short HEAD)
+  echo $(cat VERSION)-$(date +%Y%m%d)+$(git rev-parse --short HEAD)
 title: EdgeX Foundry InfluxDB Proxy Server
 license: GPL-3.0
 summary: Proxy data from EdgeX device services to InfluxDB using export-distro
 base: core18
 description: |
-  The EdgeX InfluxDB Proxy server provides a simple HTTP endpoint that is
-  registered with the export-distro EdgeX microservice, forwarding all event
-  readings to an InfluxDB server.
+  The EdgeX InfluxDB Proxy server uses the Application Functions Go SDK to 
+  recieve events via the message bus and insert all Readings into an InfluxDB
+  database.
 
 grade: stable
 confinement: strict
 
-parts:
-  influxproxy:
-    source: .
-    plugin: go
-    build-packages: [mercurial, git, build-essential]
-    override-pull: |
-      # we have to do this currently because the default go plugin does
-      # go get -t -d -v ./... which fails because influxdb doesn't have the 
-      # needed import path on the master branch which is what the go plugin
-      # tries to use
-      ROOT_PROJECT_DIR=$(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))
-      case $SNAPCRAFT_BUILD_ENVIRONMENT in 
-        host)
-          # for host build env we don't have a project specific dir
-          # so we have to copy everything, filtering out the 
-          # snapcraft generated directories
-          for dir in $(ls $ROOT_PROJECT_DIR); do
-            case $dir in
-              parts|prime|stage)
-                continue;;
-              *)
-                cp -r $ROOT_PROJECT_DIR/$dir $SNAPCRAFT_PART_SRC;;
-            esac
-          done
-          ;;
-        *)
-          # other build environments we will have a project dir that contains
-          # only the files from the original project
-          cp -r $ROOT_PROJECT_DIR/project/* $SNAPCRAFT_PART_SRC
-          ;;
-      esac
-    override-build: |
-      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
-      cd $SNAPCRAFT_PART_SRC
-      GO111MODULE=on go build -o $SNAPCRAFT_PART_INSTALL/bin/influxproxy ./cmd/influxproxy
-  scripts:
-    source: scripts
-    plugin: dump
-    organize:
-      '*.sh': bin/
-    prime:
-      - bin
-
 apps:
   influxproxy:
-    command: bin/runserver.sh
+    command: bin/edgex-influx-proxy
     daemon: simple
     restart-condition: always
     plugs:
       - network-bind
       - network
+
+parts:
+  edgex-influx-proxy:
+    source: .
+    plugin: make
+    after: [go]
+    build-packages: [mercurial, git, build-essential, pkg-config]
+    stage-packages: [libzmq3-dev]
+    override-build: |
+      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
+      cd $SNAPCRAFT_PART_SRC
+      make build
+
+      install -DT "./cmd/edgex-influx-proxy" "$SNAPCRAFT_PART_INSTALL/bin/edgex-influx-proxy"
+      install -d "$SNAPCRAFT_PART_INSTALL/config/edgex-influx-proxy/res/"
+
+      # Override 'LogFile'      
+      cat "./cmd/res/configuration.toml" | \
+        sed -e s:\"./edgex-influx-proxy.log\":\'\$SNAP_COMMON/edgex-influx-proxy.log\': \
+        -e s:'ProfilesDir = \"./res\"':'ProfilesDir = \"\$SNAP_DATA/config/edgex-influx-proxy/res\"': > \
+        "$SNAPCRAFT_PART_INSTALL/config/edgex-influx-proxy/res/configuration.toml"
+
+      # install license and attribution.txt
+      # TODO: add attribution.txt to this repo
+      # install -DT "./cmd/Attribution.txt" \
+      #    "$SNAPCRAFT_PART_INSTALL/usr/share/doc/edgex-influx-proxy/Attribution.txt"
+      install -DT "./LICENSE" \
+         "$SNAPCRAFT_PART_INSTALL/usr/share/doc/edgex-influx-proxy/LICENSE"
+  go:
+    plugin: nil
+    source: snap/local
+    build-packages: [curl]
+    override-build: |
+      # use dpkg architecture to figure out our target arch
+      # note - we specifically don't use arch
+      case "$(dpkg --print-architecture)" in
+        amd64)
+          FILE_NAME=go1.11.9.linux-amd64.tar.gz
+          FILE_HASH=e88aa3e39104e3ba6a95a4e05629348b4a1ec82791fb3c941a493ca349730608
+          ;;
+        arm64)
+          FILE_NAME=go1.11.9.linux-arm64.tar.gz
+          FILE_HASH=892ab6c2510c4caa5905b3b1b6a1d4c6f04e384841fec50881ca2be7e8accf05
+          ;;
+        armhf)
+          FILE_NAME=go1.11.9.linux-armv6l.tar.gz
+          FILE_HASH=f0d7b039cae61efdc346669f3459460e3dc03b6c6de528ca107fc53970cba0d1
+          ;;
+        i386)
+          FILE_NAME=go1.11.9.linux-386.tar.gz
+          FILE_HASH=0fa4001fcf1ef0644e261bf6dde02fc9f10ae4df6d74fda61fc4d3c3cbef1d79
+          ;;
+      esac
+      # download the archive, failing on ssl cert problems
+      curl https://dl.google.com/go/$FILE_NAME -O
+      echo "$FILE_HASH $FILE_NAME" > sha256
+      sha256sum -c sha256 | grep OK
+      tar -C $SNAPCRAFT_STAGE -xf go*.tar.gz --strip-components=1
+    prime:
+      - "-*"

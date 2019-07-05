@@ -3,3 +3,4 @@
 
 *.bz2
 vendor/
+cmd/edgex-influx-proxy
