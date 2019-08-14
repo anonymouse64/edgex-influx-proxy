@@ -1,7 +1,5 @@
 name: edgex-influx-proxy
-version: "replace-me"
-version-script: |
-  echo $(cat VERSION)-$(date +%Y%m%d)+$(git rev-parse --short HEAD)
+adopt-info: edgex-influx-proxy
 title: EdgeX Foundry InfluxDB Proxy Server
 license: GPL-3.0
 summary: Proxy data from EdgeX device services to InfluxDB using export-distro
@@ -52,6 +50,8 @@ parts:
       #    "$SNAPCRAFT_PART_INSTALL/usr/share/doc/edgex-influx-proxy/Attribution.txt"
       install -DT "./LICENSE" \
          "$SNAPCRAFT_PART_INSTALL/usr/share/doc/edgex-influx-proxy/LICENSE"
+
+      snapcraftctl set-version $(cat VERSION)-$(date +%Y%m%d)+$(git rev-parse --short HEAD)
   go:
     plugin: nil
     source: snap/local
