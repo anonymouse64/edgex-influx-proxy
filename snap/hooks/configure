@@ -1,11 +1,3 @@
 #!/bin/sh
-set -e
 
-# check to make sure a config file exists, creating one if it doesn't exist
-"$SNAP/bin/influxproxy" -c "$SNAP_DATA/config.toml" config check --write-new
-
-# run the binary with the update command
-"$SNAP/bin/influxproxy" -c "$SNAP_DATA/config.toml" config update
-
-# restart the service
-snapctl restart "$SNAP_NAME"
+# leave empty for now to allow using snap set/snap get for config items
