@@ -16,8 +16,10 @@ confinement: strict
 
 apps:
   influxproxy:
-    command: bin/edgex-influx-proxy
+    command: bin/edgex-influx-proxy -confdir $SNAP_DATA/config/edgex-influx-proxy -profile res --registry $CONSUL_ADDR
     daemon: simple
+    environment:
+      CONSUL_ADDR: "consul://localhost:8500"
     restart-condition: always
     plugs:
       - network-bind
@@ -38,7 +40,7 @@ parts:
       install -DT "./cmd/edgex-influx-proxy" "$SNAPCRAFT_PART_INSTALL/bin/edgex-influx-proxy"
       install -d "$SNAPCRAFT_PART_INSTALL/config/edgex-influx-proxy/res/"
 
-      # Override 'LogFile'      
+      # Override LogFile and ProfilesDir
       cat "./cmd/res/configuration.toml" | \
         sed -e s:\"./edgex-influx-proxy.log\":\'\$SNAP_COMMON/edgex-influx-proxy.log\': \
         -e s:'ProfilesDir = \"./res\"':'ProfilesDir = \"\$SNAP_DATA/config/edgex-influx-proxy/res\"': > \
