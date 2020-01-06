@@ -18,42 +18,17 @@ parts:
   influxproxy:
     source: .
     plugin: go
+    # TODO: if we ever have other commands we need to build, we will have to
+    # switch to using override-build, see
+    # https://bugs.launchpad.net/snapcraft/+bug/1858494
+    source-subdir: cmd/influxproxy
     build-packages: [mercurial, git, build-essential]
-    override-pull: |
-      # we have to do this currently because the default go plugin does
-      # go get -t -d -v ./... which fails because influxdb doesn't have the 
-      # needed import path on the master branch which is what the go plugin
-      # tries to use
-      ROOT_PROJECT_DIR=$(dirname $(dirname $(dirname $SNAPCRAFT_PART_SRC)))
-      case $SNAPCRAFT_BUILD_ENVIRONMENT in 
-        host)
-          # for host build env we don't have a project specific dir
-          # so we have to copy everything, filtering out the 
-          # snapcraft generated directories
-          for dir in $(ls $ROOT_PROJECT_DIR); do
-            case $dir in
-              parts|prime|stage)
-                continue;;
-              *)
-                cp -r $ROOT_PROJECT_DIR/$dir $SNAPCRAFT_PART_SRC;;
-            esac
-          done
-          ;;
-        *)
-          # other build environments we will have a project dir that contains
-          # only the files from the original project
-          cp -r $ROOT_PROJECT_DIR/project/* $SNAPCRAFT_PART_SRC
-          ;;
-      esac
-    override-build: |
-      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
-      cd $SNAPCRAFT_PART_SRC
-      GO111MODULE=on go build -o $SNAPCRAFT_PART_INSTALL/bin/influxproxy ./cmd/influxproxy
+    go-importpath: github.com/anonymouse64/edgex-influx-proxy
   scripts:
     source: scripts
     plugin: dump
     organize:
-      '*.sh': bin/
+      "*.sh": bin/
     prime:
       - bin
 
