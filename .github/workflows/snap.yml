@@ -22,15 +22,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-snap
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2.3.4
       - name: Download built snap
         uses: actions/download-artifact@v2
         with:
           name: snap-files
-      - name: Install built snap
-        shell: bash
-        run: sudo snap install --dangerous edgex-influx-proxy*.snap
-      - name: Verify snap runs
+      - name: Test built snap
         shell: bash
         run: |
-          # TODO: write actual tests here
-          exit 0
+          ./test.sh edgex-influx-proxy*.snap
