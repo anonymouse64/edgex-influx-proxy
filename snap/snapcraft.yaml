@@ -33,7 +33,8 @@ parts:
   edgex-influx-proxy:
     source: .
     plugin: make
-    after: [go]
+    build-snaps:
+      - go
     build-packages: [mercurial, git, build-essential, pkg-config]
     stage-packages: [libzmq3-dev]
     override-build: |
@@ -58,35 +59,3 @@ parts:
          "$SNAPCRAFT_PART_INSTALL/usr/share/doc/edgex-influx-proxy/LICENSE"
 
       snapcraftctl set-version $(cat VERSION)-$(date +%Y%m%d)+$(git rev-parse --short HEAD)
-  go:
-    plugin: nil
-    source: snap/local
-    build-packages: [curl]
-    override-build: |
-      # use dpkg architecture to figure out our target arch
-      # note - we specifically don't use arch
-      case "$(dpkg --print-architecture)" in
-        amd64)
-          FILE_NAME=go1.12.8.linux-amd64.tar.gz
-          FILE_HASH=bd26cd4962a362ed3c11835bca32c2e131c2ae050304f2c4df9fa6ded8db85d2
-          ;;
-        arm64)
-          FILE_NAME=go1.12.8.linux-arm64.tar.gz
-          FILE_HASH=15e9e0b5b414d1a0322896368c0050af6ab1cd82d050e93f8eceb38ef2626652
-          ;;
-        armhf)
-          FILE_NAME=go1.12.8.linux-armv6l.tar.gz
-          FILE_HASH=b6b057e7b5c740894132ce30e70503d7d36988dcd61a00f0865d1e7d6dcc74ca
-          ;;
-        i386)
-          FILE_NAME=go1.12.8.linux-386.tar.gz
-          FILE_HASH=be164c4e04205c4fc713e81594bc2fdd4c94dff3d567ec8e0072223dd0778287
-          ;;
-      esac
-      # download the archive, failing on ssl cert problems
-      curl https://dl.google.com/go/$FILE_NAME -O
-      echo "$FILE_HASH $FILE_NAME" > sha256
-      sha256sum -c sha256 | grep OK
-      tar -C $SNAPCRAFT_STAGE -xf go*.tar.gz --strip-components=1
-    prime:
-      - "-*"
