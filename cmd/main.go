@@ -167,7 +167,7 @@ func sendToInfluxDBFunc(influxClient influx.Client, ptConfig influx.BatchPointsC
 
 				// Calculate the unix time from the origin time in the reading
 				// note that the origin time is in milliseconds
-				unixTime := float64(reading.Origin) / float64(time.Second/time.Millisecond)
+				unixTime := float64(reading.Origin) / float64(time.Second/time.Nanosecond)
 				unixTimeSec := math.Floor(unixTime)
 				unixTimeNSec := int64((unixTime - unixTimeSec) * float64(time.Second/time.Nanosecond))
 
