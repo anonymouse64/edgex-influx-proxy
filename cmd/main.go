@@ -23,12 +23,6 @@ const (
 	Version    = "1.0.0"
 )
 
-// var readingNameToPropertyValue map[string]models.PropertyValue
-
-// func init() {
-// 	readingNameToPropertyValue = make(map[string]models.PropertyValue)
-// }
-
 func main() {
 	// create the SDK with the service key
 	edgexSdk := &appsdk.AppFunctionsSDK{ServiceKey: serviceKey}
@@ -37,21 +31,6 @@ func main() {
 		edgexSdk.LoggingClient.Error(fmt.Sprintf("SDK initialization failed: %v\n", err))
 		os.Exit(-1)
 	}
-
-	// TODO: figure out how best to create a core-metadata clienta
-	// params := types.EndpointParams{
-	// 	UseRegistry: isRegistry,
-	// 	Interval:    15,
-	// }
-
-	// isRegistry := common.UseRegistry
-	// var waitGroup sync.WaitGroup
-	// waitGroup.Add(clientCount)
-
-	// endpoint := &endpoint.Endpoint{RegistryClient: config.RegistryClient, WG: &waitGroup}
-
-	// // make a client to core-metadata
-	// metadataClient := metadata.NewDeviceProfileClient(params)
 
 	// get the app service configuration
 	influxConfig := influx.HTTPConfig{}
