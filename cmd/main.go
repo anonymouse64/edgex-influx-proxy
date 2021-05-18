@@ -131,7 +131,7 @@ func sendToInfluxDBFunc(influxClient influx.Client, ptConfig influx.BatchPointsC
 	return func(edgexcontext *appcontext.Context, params ...interface{}) (bool, interface{}) {
 		if len(params) < 1 {
 			// We didn't receive a result
-			return false, errors.New("No Data Received")
+			return false, errors.New("no data received")
 		}
 
 		for _, obj := range params {
