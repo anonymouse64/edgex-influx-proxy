@@ -2,15 +2,15 @@
   LogLevel = 'INFO'
 
 [Service]
-  BootTimeout = 30000
-  ClientMonitor = 15000
+  BootTimeout = "30s"
   CheckInterval = '10s'
+  ServerBindAddr = ''
   Host = 'localhost'
   Port = 48095
   Protocol = 'http'
   ReadMaxLimit = 100
   StartupMsg = 'Sends data from EdgeX to InfluxDB'
-  Timeout = 5000
+  Timeout = "5s"
 
 [Registry]
   Host = 'localhost'
@@ -22,7 +22,7 @@
     Protocol = 'http'
     Host = 'localhost'
     Port = 48080
-  
+
 [MessageBus]
   Type = 'zero'
   [MessageBus.PublishHost]
